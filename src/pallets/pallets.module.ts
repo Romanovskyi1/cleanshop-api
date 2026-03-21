@@ -3,7 +3,7 @@ import { TypeOrmModule }   from '@nestjs/typeorm';
 import { PalletsService }  from './pallets.service';
 import { PalletsController } from './pallets.controller';
 import { Pallet, PalletItem } from './entities/pallet.entity';
-import { Truck }           from '../../orders/entities/truck.entity';
+import { Truck }           from '../orders/entities/truck.entity';
 
 @Module({
   imports: [

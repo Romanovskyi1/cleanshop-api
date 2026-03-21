@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService }       from '@nestjs/config';
 import Anthropic               from '@anthropic-ai/sdk';
-import { MessageIntent }       from '../entities/chat-message.entity';
-import { ParsedAiResponse }    from '../dto/chat.dto';
-import { buildSystemPrompt, ClientContext } from '../prompts/system-prompt';
+import { MessageIntent }       from './entities/chat-message.entity';
+import { ParsedAiResponse }    from './dto/chat.dto';
+import { buildSystemPrompt, ClientContext } from './prompts/system-prompt';
 
 // Максимум сообщений в истории передаваемых в API (окно контекста)
 const HISTORY_WINDOW = 20;

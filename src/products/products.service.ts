@@ -103,7 +103,7 @@ export class ProductsService {
 
     return {
       ...this.toListItem(product, lang),
-      description:     this.localise(product.description, lang),
+      description:     this.localise(product.description as Record<string, string>, lang),
       palletsPerTruck: product.palletsPerTruck,
       palletPriceEur:  product.palletPriceEur,
       palletWeightKg:  Number(product.palletWeightKg) || product.computedBoxWeightKg * product.boxesPerPallet,
@@ -235,8 +235,8 @@ export class ProductsService {
     return {
       id:             product.id,
       sku:            product.sku,
-      name:           this.localise(product.name, lang),
-      description:    this.localise(product.description, lang),
+      name:           this.localise(product.name as Record<string, string>, lang),
+      description:    this.localise(product.description as Record<string, string>, lang),
       category:       product.category,
       volumeL:        Number(product.volumeL) || null,
       priceEur:       Number(product.priceEur),

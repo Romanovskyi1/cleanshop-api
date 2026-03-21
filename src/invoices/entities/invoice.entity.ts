@@ -112,6 +112,9 @@ export class InvoiceDelivery {
   @Column({ name: 'attempts', default: 0 })
   attempts: number;
 
+  @Column({ name: 'external_id', nullable: true })
+  externalId: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -63,18 +63,16 @@ export class InvoicesService {
     // Сохраняем запись инвойса
     const invoice = await this.invoices.save(
       this.invoices.create({
-        invoiceNumber:    dto.invoiceNumber,
-        orderId:          dto.orderId,
-        companyId:        dto.companyId,
-        createdBy:        managerId,
-        issuedAt:         new Date(dto.issuedAt),
-        dueDate:          dto.dueDate,
-        subtotalEur:      dto.subtotalEur,
-        vatRate:          dto.vatRate,
-        vatAmount:        dto.vatAmount,
-        totalEur:         dto.totalEur,
-        originalFilename: filename,
-        status:           InvoiceStatus.PENDING,
+        invoiceNumber: dto.invoiceNumber,
+        orderId:       dto.orderId ?? null,
+        companyId:     dto.companyId,
+        issuedBy:      managerId,
+        dueDate:       dto.dueDate,
+        subtotalEur:   dto.subtotalEur,
+        vatRate:       dto.vatRate,
+        vatAmount:     dto.vatAmount ?? (dto.subtotalEur * dto.vatRate / 100),
+        totalEur:      dto.totalEur ?? (dto.subtotalEur * (1 + dto.vatRate / 100)),
+        status:        InvoiceStatus.PENDING,
       }),
     );
 

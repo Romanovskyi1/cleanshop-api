@@ -6,7 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 
 import { Pallet, PalletItem, PalletStatus } from './entities/pallet.entity';
-import { Truck }                            from '../../orders/entities/truck.entity';
+import { Truck }                            from '../orders/entities/truck.entity';
 import {
   CreatePalletDto, UpdatePalletDto,
   AddPalletItemDto, UpdatePalletItemDto,
