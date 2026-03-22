@@ -209,8 +209,18 @@ export class AuthService {
     });
   }
   async devLogin(telegramId: string): Promise<{ accessToken: string; refreshToken: string; user: User }> {
-    const user = await this.users.findByTelegramId(telegramId);
-    if (!user) throw new Error('User not found');
+    let user = await this.users.findByTelegramId(telegramId);
+
+    if (!user) {
+      user = await this.users.upsert({
+        id:            Number(telegramId),
+        first_name:    'Dev',
+        last_name:     'User',
+        username:      'devuser',
+        language_code: 'ru',
+      });
+    }
+
     return {
       accessToken:  this.signAccess(user),
       refreshToken: this.signRefresh(user),
