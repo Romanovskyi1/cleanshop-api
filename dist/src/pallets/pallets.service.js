@@ -89,7 +89,6 @@ let PalletsService = PalletsService_1 = class PalletsService {
         return this.ds.transaction(async (em) => {
             const specifiedPallet = await em.findOne(pallet_entity_1.Pallet, {
                 where: { id: palletId, companyId },
-                relations: ['items'],
             });
             if (!specifiedPallet)
                 throw new common_1.NotFoundException(`Паллета #${palletId} не найдена`);
@@ -170,7 +169,6 @@ let PalletsService = PalletsService_1 = class PalletsService {
         return this.ds.transaction(async (em) => {
             const pallet = await em.findOne(pallet_entity_1.Pallet, {
                 where: { id: palletId, companyId },
-                relations: ['items'],
             });
             if (!pallet)
                 throw new common_1.NotFoundException(`Паллета #${palletId} не найдена`);
@@ -210,7 +208,6 @@ let PalletsService = PalletsService_1 = class PalletsService {
         return this.ds.transaction(async (em) => {
             const pallet = await em.findOne(pallet_entity_1.Pallet, {
                 where: { id: palletId, companyId },
-                lock: { mode: 'pessimistic_write' },
             });
             if (!pallet)
                 throw new common_1.NotFoundException(`Паллета #${palletId} не найдена`);

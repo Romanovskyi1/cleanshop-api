@@ -143,7 +143,6 @@ export class PalletsService {
     return this.ds.transaction(async (em: EntityManager) => {
       const specifiedPallet = await em.findOne(Pallet, {
         where: { id: palletId, companyId },
-        relations: ['items'],
       });
       if (!specifiedPallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
       this.assertEditable(specifiedPallet);
@@ -267,7 +266,6 @@ export class PalletsService {
     return this.ds.transaction(async (em: EntityManager) => {
       const pallet = await em.findOne(Pallet, {
         where: { id: palletId, companyId },
-        relations: ['items'],
       });
       if (!pallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
       this.assertEditable(pallet);
@@ -325,7 +323,6 @@ export class PalletsService {
     return this.ds.transaction(async (em: EntityManager) => {
       const pallet = await em.findOne(Pallet, {
         where: { id: palletId, companyId },
-        lock: { mode: 'pessimistic_write' },
       });
       if (!pallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
       this.assertEditable(pallet);
