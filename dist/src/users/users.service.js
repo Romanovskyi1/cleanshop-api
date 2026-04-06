@@ -46,6 +46,26 @@ let UsersService = class UsersService {
         }
         return this.repo.save(user).catch(() => this.repo.findOneOrFail({ where: { telegramId: String(tgUser.id) } }));
     }
+    async findOrCreateByTelegramId(telegramId, firstName) {
+        let user = await this.findByTelegramId(telegramId);
+        if (!user) {
+            user = this.repo.create({
+                telegramId,
+                firstName: firstName ?? 'Client',
+                lastName: '',
+                languageCode: 'ru',
+            });
+            user = await this.repo.save(user);
+        }
+        return user;
+    }
+    async linkToCompany(userId, companyId) {
+        const user = await this.findById(userId);
+        if (!user)
+            throw new Error(`User #${userId} not found`);
+        user.companyId = companyId;
+        return this.repo.save(user);
+    }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([

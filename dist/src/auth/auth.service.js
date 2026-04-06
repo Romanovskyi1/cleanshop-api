@@ -12,6 +12,10 @@ var AuthService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
+const MANAGER_CREDENTIALS = {
+    admin: { password: 'cleanshop2025', telegramId: '1114140052' },
+    manager: { password: 'manager2025', telegramId: '453784171' },
+};
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const crypto = require("crypto");
@@ -141,10 +145,39 @@ let AuthService = AuthService_1 = class AuthService {
             expiresIn: this.config.get('JWT_REFRESH_EXPIRES', '30d'),
         });
     }
+    async loginWithCredentials(username, password) {
+        const cred = MANAGER_CREDENTIALS[username];
+        if (!cred || cred.password !== password) {
+            throw new common_1.UnauthorizedException('Неверный логин или пароль');
+        }
+        const user = await this.users.findByTelegramId(cred.telegramId);
+        if (!user) {
+            throw new common_1.UnauthorizedException('Пользователь не найден в БД');
+        }
+        return {
+            accessToken: this.signAccess(user),
+            refreshToken: this.signRefresh(user),
+            user: {
+                id: user.id,
+                telegramId: user.telegramId,
+                displayName: user.displayName,
+                role: user.role,
+                companyId: user.companyId,
+                languageCode: user.languageCode,
+            },
+        };
+    }
     async devLogin(telegramId) {
-        const user = await this.users.findByTelegramId(telegramId);
-        if (!user)
-            throw new Error('User not found');
+        let user = await this.users.findByTelegramId(telegramId);
+        if (!user) {
+            user = await this.users.upsert({
+                id: Number(telegramId),
+                first_name: 'Dev',
+                last_name: 'User',
+                username: 'devuser',
+                language_code: 'ru',
+            });
+        }
         return {
             accessToken: this.signAccess(user),
             refreshToken: this.signRefresh(user),

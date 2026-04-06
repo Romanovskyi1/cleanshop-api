@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   boxes_per_pallet — коробок на паллете
  *   pallets_per_truck — паллет в одной фуре (стандарт 33)
  */
-export class CreateProducts1700000003 implements MigrationInterface {
-  name = 'CreateProducts1700000003';
+export class CreateProducts1700000003000 implements MigrationInterface {
+  name = 'CreateProducts1700000003000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

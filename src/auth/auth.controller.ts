@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { TelegramAuthDto, RefreshTokenDto } from './dto/auth.dto';
+import { TelegramAuthDto, RefreshTokenDto, CredentialsLoginDto } from './dto/auth.dto';
 import { Public }       from '../common/decorators/public.decorator';
 import { CurrentUser }  from '../common/decorators/current-user.decorator';
 import { Roles }        from '../common/decorators/roles.decorator';
@@ -79,6 +79,14 @@ export class AuthController {
   @Get('check-manager')
   checkManager(@CurrentUser() user: User) {
     return { ok: true, role: user.role };
+  }
+
+  @Public()
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() dto: CredentialsLoginDto) {
+    const result = await this.authService.loginWithCredentials(dto.username, dto.password);
+    return result;
   }
 
   @Public()

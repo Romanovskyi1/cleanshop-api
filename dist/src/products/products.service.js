@@ -187,6 +187,13 @@ let ProductsService = ProductsService_1 = class ProductsService {
             return '';
         return field[lang] ?? field['en'] ?? field['ru'] ?? '';
     }
+    async addImages(id, urls) {
+        const product = await this.repo.findOne({ where: { id } });
+        if (!product)
+            throw new common_1.NotFoundException(`Продукт #${id} не найден`);
+        product.images = [...(product.images ?? []), ...urls];
+        return this.repo.save(product);
+    }
 };
 exports.ProductsService = ProductsService;
 exports.ProductsService = ProductsService = ProductsService_1 = __decorate([

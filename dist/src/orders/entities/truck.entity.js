@@ -14,9 +14,7 @@ const typeorm_1 = require("typeorm");
 const order_entity_1 = require("./order.entity");
 let Truck = class Truck {
     get displayName() {
-        return this.licensePlate
-            ? `Фура ${this.number} (${this.licensePlate})`
-            : `Фура ${this.number}`;
+        return `Фура ${this.number}`;
     }
 };
 exports.Truck = Truck;
@@ -52,14 +50,6 @@ __decorate([
     }),
     __metadata("design:type", Number)
 ], Truck.prototype, "maxWeightKg", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'license_plate', nullable: true, length: 20 }),
-    __metadata("design:type", String)
-], Truck.prototype, "licensePlate", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'driver_name', nullable: true, length: 255 }),
-    __metadata("design:type", String)
-], Truck.prototype, "driverName", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)({ name: 'created_at', type: 'timestamptz' }),
     __metadata("design:type", Date)

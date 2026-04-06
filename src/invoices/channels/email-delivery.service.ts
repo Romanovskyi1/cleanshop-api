@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService }       from '@nestjs/config';
-import sgMail                  from '@sendgrid/mail';
+import * as sgMail              from '@sendgrid/mail';
 
 export interface EmailSendResult {
   ok:      boolean;
@@ -15,8 +15,11 @@ export class EmailDeliveryService {
   private readonly fromName: string;
 
   constructor(private readonly config: ConfigService) {
-    sgMail.setApiKey(config.getOrThrow<string>('SENDGRID_API_KEY'));
-    this.from     = config.getOrThrow<string>('SENDGRID_FROM');
+    const key = config.get<string>('SENDGRID_API_KEY');
+    if (key && key !== 'placeholder') {
+      (sgMail as any).setApiKey(key);
+    }
+    this.from     = config.get<string>('SENDGRID_FROM', 'noreply@cleanshop.com');
     this.fromName = config.get<string>('SENDGRID_FROM_NAME', 'CleanShop B2B');
   }
 

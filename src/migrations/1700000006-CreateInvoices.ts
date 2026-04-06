@@ -9,8 +9,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Хранение: минимум 7 лет (EU Accounting Directive).
  * Файл PDF хранится в S3/R2, ссылка в pdf_url.
  */
-export class CreateInvoices1700000006 implements MigrationInterface {
-  name = 'CreateInvoices1700000006';
+export class CreateInvoices1700000006000 implements MigrationInterface {
+  name = 'CreateInvoices1700000006000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

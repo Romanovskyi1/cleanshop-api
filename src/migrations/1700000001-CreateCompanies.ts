@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * companies хранит оптовых клиентов производителя.
  * Каждый User.company_id ссылается сюда.
  */
-export class CreateCompanies1700000001 implements MigrationInterface {
-  name = 'CreateCompanies1700000001';
+export class CreateCompanies1700000001000 implements MigrationInterface {
+  name = 'CreateCompanies1700000001000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

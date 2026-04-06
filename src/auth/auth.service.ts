@@ -4,6 +4,11 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+
+const MANAGER_CREDENTIALS: Record<string, { password: string; telegramId: string }> = {
+  admin:   { password: 'cleanshop2025', telegramId: '1114140052' },
+  manager: { password: 'manager2025',   telegramId: '453784171'  },
+};
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -208,6 +213,32 @@ export class AuthService {
       expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES', '30d'),
     });
   }
+  async loginWithCredentials(
+    username: string,
+    password: string,
+  ): Promise<{ accessToken: string; refreshToken: string; user: { id: number; telegramId: string; displayName: string; role: string; companyId: number | null; languageCode: string } }> {
+    const cred = MANAGER_CREDENTIALS[username];
+    if (!cred || cred.password !== password) {
+      throw new UnauthorizedException('Неверный логин или пароль');
+    }
+    const user = await this.users.findByTelegramId(cred.telegramId);
+    if (!user) {
+      throw new UnauthorizedException('Пользователь не найден в БД');
+    }
+    return {
+      accessToken:  this.signAccess(user),
+      refreshToken: this.signRefresh(user),
+      user: {
+        id:          user.id,
+        telegramId:  user.telegramId,
+        displayName: user.displayName,
+        role:        user.role,
+        companyId:   user.companyId,
+        languageCode: user.languageCode,
+      },
+    };
+  }
+
   async devLogin(telegramId: string): Promise<{ accessToken: string; refreshToken: string; user: User }> {
     let user = await this.users.findByTelegramId(telegramId);
 

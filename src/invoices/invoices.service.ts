@@ -66,7 +66,7 @@ export class InvoicesService {
         invoiceNumber: dto.invoiceNumber,
         orderId:       dto.orderId ?? null,
         companyId:     dto.companyId,
-        issuedBy:      managerId,
+        issuedAt:      new Date(),
         dueDate:       dto.dueDate,
         subtotalEur:   dto.subtotalEur,
         vatRate:       dto.vatRate,

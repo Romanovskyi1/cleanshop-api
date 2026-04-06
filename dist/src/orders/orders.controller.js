@@ -45,11 +45,26 @@ let OrdersController = class OrdersController {
         const companyId = user.isManager ? undefined : user.companyId;
         return this.service.update(id, companyId ?? user.companyId, dto);
     }
+    remove(id, user) {
+        return this.service.removeDraft(id, user.companyId);
+    }
+    forceDelete(id) {
+        return this.service.forceDelete(id);
+    }
+    submit(id, user) {
+        return this.service.submitDraft(id, user.companyId, user.id);
+    }
+    clientCancel(id, user) {
+        return this.service.clientCancelOrder(id, user.companyId, user.id);
+    }
     proposeDate(id, user, dto) {
         return this.service.proposeDate(id, user.companyId, user.id, dto);
     }
     confirmDate(id, manager, dto) {
         return this.service.confirmDate(id, manager.id, dto);
+    }
+    openWindow(id, manager) {
+        return this.service.openPalletWindow(id, manager.id);
     }
     confirmPlan(id, user, dto) {
         return this.service.confirmPlan(id, user.companyId, user.id, dto);
@@ -113,6 +128,42 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], OrdersController.prototype, "update", null);
 __decorate([
+    (0, common_1.Delete)(':id'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, user_entity_1.User]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Delete)(':id/force'),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.ADMIN),
+    (0, common_1.HttpCode)(common_1.HttpStatus.NO_CONTENT),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "forceDelete", null);
+__decorate([
+    (0, common_1.Post)(':id/submit'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, user_entity_1.User]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "submit", null);
+__decorate([
+    (0, common_1.Post)(':id/client-cancel'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, user_entity_1.User]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "clientCancel", null);
+__decorate([
     (0, common_1.Post)(':id/propose-date'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
@@ -135,6 +186,16 @@ __decorate([
         order_dto_1.ConfirmDateDto]),
     __metadata("design:returntype", void 0)
 ], OrdersController.prototype, "confirmDate", null);
+__decorate([
+    (0, common_1.Post)(':id/open-window'),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.MANAGER),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('id', common_1.ParseIntPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, user_entity_1.User]),
+    __metadata("design:returntype", void 0)
+], OrdersController.prototype, "openWindow", null);
 __decorate([
     (0, common_1.Post)(':id/confirm-plan'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

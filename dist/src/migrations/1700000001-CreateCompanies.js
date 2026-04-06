@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateCompanies1700000001 = void 0;
-class CreateCompanies1700000001 {
+exports.CreateCompanies1700000001000 = void 0;
+class CreateCompanies1700000001000 {
     constructor() {
-        this.name = 'CreateCompanies1700000001';
+        this.name = 'CreateCompanies1700000001000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -47,5 +47,5 @@ class CreateCompanies1700000001 {
         await queryRunner.query(`DROP FUNCTION IF EXISTS update_updated_at`);
     }
 }
-exports.CreateCompanies1700000001 = CreateCompanies1700000001;
+exports.CreateCompanies1700000001000 = CreateCompanies1700000001000;
 //# sourceMappingURL=1700000001-CreateCompanies.js.map

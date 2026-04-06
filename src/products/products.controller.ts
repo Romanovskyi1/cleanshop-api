@@ -2,7 +2,13 @@ import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, ParseIntPipe,
   HttpCode, HttpStatus,
+  UseInterceptors, UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage }      from 'multer';
+import * as path            from 'path';
+import * as fs              from 'fs';
 import { ProductsService }    from './products.service';
 import {
   CreateProductDto, UpdateProductDto, ProductQueryDto,
@@ -118,4 +124,33 @@ export class ProductsController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.adminRemove(id);
   }
+
+  @Post(":id/images")
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FilesInterceptor("files", 5, {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        const dir = "./uploads/products";
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const name = Date.now() + "-" + Math.round(Math.random() * 1e6) + ext;
+        cb(null, name);
+      },
+    }),
+    fileFilter: (req, file, cb) => {
+      const ok = /image\/(jpeg|png|webp)/.test(file.mimetype);
+      cb(ok ? null : new BadRequestException("Только jpeg/png/webp"), ok);
+      },
+  }))
+  uploadImages(
+    @Param("id", ParseIntPipe) id: number,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const urls = files.map(f => "/uploads/products/" + f.filename);
+    return this.service.addImages(id, urls);
+  }
+
 }

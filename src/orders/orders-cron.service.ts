@@ -46,7 +46,7 @@ export class OrdersCronService {
         // Push клиенту
         await this.sendPush(
           order.companyId,
-          this.buildOpenMsg(order.id, order.windowClosesAt!),
+          this.buildOpenMsg(order.id, new Date()),
         );
 
         this.logger.log(`[Cron] Pallet window opened: order #${order.id}`);
@@ -71,7 +71,7 @@ export class OrdersCronService {
         o.companyId,
         `⏳ <b>Напоминание о паллетах</b>\n\n` +
         `Погрузка #${o.id}: осталось <b>2 дня</b> для сборки паллет.\n` +
-        `Дедлайн: ${this.fmtDate(o.windowClosesAt!)}`,
+        `Дедлайн: ${this.fmtDate(new Date())}`,
       ).catch(e => this.logger.error(`Push failed: ${e.message}`));
     }
   }

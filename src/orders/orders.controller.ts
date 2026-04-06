@@ -1,13 +1,13 @@
 // src/orders/orders.controller.ts
 import {
-  Controller, Get, Post, Patch, Param,
+  Controller, Get, Post, Patch, Delete, Param,
   Body, Query, ParseIntPipe, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { OrdersService }   from './orders.service';
 import {
   CreateOrderDto, ProposeDateDto, ConfirmDateDto,
   ConfirmPlanDto, CancelOrderDto, ShipOrderDto,
-  UpdateOrderDto, OrderQueryDto,
+  UpdateOrderDto, OrderQueryDto, SubmitOrderDto,
 } from './dto/order.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles }       from '../common/decorators/roles.decorator';
@@ -93,7 +93,57 @@ export class OrdersController {
     return this.service.update(id, companyId ?? user.companyId, dto);
   }
 
+  /**
+   * DELETE /orders/:id
+   * Клиент удаляет черновик заказа.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    return this.service.removeDraft(id, user.companyId);
+  }
+
+  /**
+   * DELETE /orders/:id/force
+   * Admin принудительно удаляет заказ любого статуса.
+   */
+  @Delete(':id/force')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  forceDelete(@Param('id', ParseIntPipe) id: number) {
+    return this.service.forceDelete(id);
+  }
+
   // ── Согласование дат ──────────────────────────────────────────────────────────
+
+  /**
+   * POST /orders/:id/submit
+   * Клиент отправляет черновик менеджеру → draft → negotiating.
+   */
+  @Post(':id/submit')
+  @HttpCode(HttpStatus.OK)
+  submit(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    return this.service.submitDraft(id, user.companyId, user.id);
+  }
+
+  /**
+   * POST /orders/:id/client-cancel
+   * Клиент отменяет negotiating заказ.
+   */
+  @Post(':id/client-cancel')
+  @HttpCode(HttpStatus.OK)
+  clientCancel(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    return this.service.clientCancelOrder(id, user.companyId, user.id);
+  }
 
   /**
    * POST /orders/:id/propose-date
@@ -127,6 +177,21 @@ export class OrdersController {
   }
 
   // ── Паллеты ───────────────────────────────────────────────────────────────────
+
+  /**
+   * POST /orders/:id/open-window
+   * Менеджер вручную открывает окно паллет.
+   * confirmed → building
+   */
+  @Post(':id/open-window')
+  @Roles(UserRole.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  openWindow(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() manager: User,
+  ) {
+    return this.service.openPalletWindow(id, manager.id);
+  }
 
   /**
    * POST /orders/:id/confirm-plan

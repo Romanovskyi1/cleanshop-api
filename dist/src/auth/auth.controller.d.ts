@@ -1,5 +1,5 @@
 import { AuthService } from './auth.service';
-import { TelegramAuthDto, RefreshTokenDto } from './dto/auth.dto';
+import { TelegramAuthDto, RefreshTokenDto, CredentialsLoginDto } from './dto/auth.dto';
 import { UserRole, User } from '../users/user.entity';
 export declare class AuthController {
     private readonly authService;
@@ -36,6 +36,18 @@ export declare class AuthController {
         ok: boolean;
         role: UserRole;
     };
+    login(dto: CredentialsLoginDto): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        user: {
+            id: number;
+            telegramId: string;
+            displayName: string;
+            role: string;
+            companyId: number | null;
+            languageCode: string;
+        };
+    }>;
     devLogin(body: {
         telegramId: string;
     }): Promise<{

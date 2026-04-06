@@ -32,8 +32,8 @@ let OrdersService = OrdersService_1 = class OrdersService {
     async create(companyId, actorId, dto) {
         let order = this.orders.create({
             companyId,
-            truckCount: dto.truckCount ?? 1,
             notes: dto.notes ?? null,
+            truckType: dto.truckType ?? null,
             status: order_entity_1.OrderStatus.DRAFT,
         });
         order = await this.orders.save(order);
@@ -77,13 +77,49 @@ let OrdersService = OrdersService_1 = class OrdersService {
         }
         return order;
     }
+    async removeDraft(id, companyId) {
+        const order = await this.findOne(id, companyId);
+        if (order.status !== order_entity_1.OrderStatus.DRAFT) {
+            throw new common_1.ForbiddenException('Можно удалить только черновик заказа');
+        }
+        await this.orders.remove(order);
+        this.logger.log(`Order #${id} (draft) deleted by company ${companyId}`);
+    }
+    async submitDraft(id, companyId, actorId) {
+        const order = await this.findOne(id, companyId);
+        if (order.status !== order_entity_1.OrderStatus.DRAFT) {
+            throw new common_1.BadRequestException('Можно отправить только черновик');
+        }
+        order.status = order_entity_1.OrderStatus.NEGOTIATING;
+        order.proposedBy = actorId;
+        await this.orders.save(order);
+        await this.writeHistory(order.id, order_entity_1.OrderStatus.DRAFT, order_entity_1.OrderStatus.NEGOTIATING, actorId, 'client', 'Клиент отправил заказ менеджеру');
+        this.logger.log(`Order #${id}: submitted (draft→negotiating) by client ${actorId}`);
+        return order;
+    }
+    async clientCancelOrder(id, companyId, actorId) {
+        const order = await this.findOne(id, companyId);
+        if (order.status !== order_entity_1.OrderStatus.NEGOTIATING) {
+            throw new common_1.BadRequestException('Клиент может отменить только заказ в статусе согласования');
+        }
+        order.status = order_entity_1.OrderStatus.CANCELLED;
+        await this.orders.save(order);
+        await this.writeHistory(order.id, order_entity_1.OrderStatus.NEGOTIATING, order_entity_1.OrderStatus.CANCELLED, actorId, 'client', 'Отменён клиентом');
+        this.logger.log(`Order #${id}: cancelled by client ${actorId}`);
+        return order;
+    }
+    async forceDelete(id) {
+        const order = await this.orders.findOne({ where: { id } });
+        if (!order)
+            throw new common_1.NotFoundException(`Заказ #${id} не найден`);
+        await this.orders.remove(order);
+        this.logger.log(`Order #${id} force-deleted by admin`);
+    }
     async update(id, companyId, dto) {
         const order = await this.findOne(id, companyId);
         if (!order.isEditable) {
             throw new common_1.ForbiddenException('Заказ нельзя редактировать в текущем статусе');
         }
-        if (dto.truckCount !== undefined)
-            order.truckCount = dto.truckCount;
         if (dto.notes !== undefined)
             order.notes = dto.notes;
         return this.orders.save(order);
@@ -116,8 +152,6 @@ let OrdersService = OrdersService_1 = class OrdersService {
         order.confirmedDate = dto.confirmedDate;
         order.confirmedBy = actorId;
         order.status = order_entity_1.OrderStatus.CONFIRMED;
-        if (dto.truckCount)
-            order.truckCount = dto.truckCount;
         const { opens, closes } = this.calcPalletWindow(dto.confirmedDate);
         order.windowOpensAt = opens;
         order.windowClosesAt = closes;
@@ -127,13 +161,18 @@ let OrdersService = OrdersService_1 = class OrdersService {
             `window ${opens.toISOString()} – ${closes.toISOString()}`);
         return order;
     }
-    async openPalletWindow(id) {
+    async openPalletWindow(id, actorId = null) {
         const order = await this.findOne(id);
         this.assertTransition(order, order_entity_1.OrderStatus.BUILDING);
         order.status = order_entity_1.OrderStatus.BUILDING;
+        if (!order.windowClosesAt && order.confirmedDate) {
+            const { opens, closes } = this.calcPalletWindow(order.confirmedDate);
+            order.windowOpensAt = opens;
+            order.windowClosesAt = closes;
+        }
         await this.orders.save(order);
-        await this.writeHistory(order.id, order_entity_1.OrderStatus.CONFIRMED, order_entity_1.OrderStatus.BUILDING, null, 'system', 'Окно паллет открыто автоматически');
-        this.logger.log(`Order #${id}: pallet window OPENED (building)`);
+        await this.writeHistory(order.id, order_entity_1.OrderStatus.CONFIRMED, order_entity_1.OrderStatus.BUILDING, actorId, actorId ? 'manager' : 'system', actorId ? 'Окно паллет открыто менеджером вручную' : 'Окно паллет открыто автоматически');
+        this.logger.log(`Order #${id}: pallet window OPENED (building) by ${actorId ?? 'system'}`);
         return order;
     }
     async confirmPlan(id, companyId, actorId, dto) {
@@ -143,7 +182,6 @@ let OrdersService = OrdersService_1 = class OrdersService {
             throw new common_1.BadRequestException('Окно паллет закрыто — нельзя подтвердить план');
         }
         order.status = order_entity_1.OrderStatus.LOCKED;
-        order.lockedBy = actorId;
         await this.orders.save(order);
         await this.writeHistory(order.id, order_entity_1.OrderStatus.BUILDING, order_entity_1.OrderStatus.LOCKED, actorId, 'client', dto.comment ?? 'Клиент подтвердил план загрузки');
         this.logger.log(`Order #${id}: plan LOCKED by client ${actorId}`);
@@ -163,7 +201,6 @@ let OrdersService = OrdersService_1 = class OrdersService {
         const order = await this.findOne(id);
         this.assertTransition(order, order_entity_1.OrderStatus.SHIPPED);
         order.status = order_entity_1.OrderStatus.SHIPPED;
-        order.shippedBy = actorId;
         order.shippedAt = new Date();
         await this.orders.save(order);
         await this.writeHistory(order.id, order_entity_1.OrderStatus.LOCKED, order_entity_1.OrderStatus.SHIPPED, actorId, 'manager', dto.comment ?? 'Отгрузка выполнена');
@@ -199,7 +236,7 @@ let OrdersService = OrdersService_1 = class OrdersService {
         return this.orders
             .createQueryBuilder('o')
             .where('o.status = :status', { status: order_entity_1.OrderStatus.BUILDING })
-            .andWhere('o.window_closes_at < :now', { now: new Date() })
+            .andWhere('o.pallet_deadline < :now', { now: new Date() })
             .getMany();
     }
     async findOrdersForReminder(daysBeforeDeadline) {
@@ -211,7 +248,7 @@ let OrdersService = OrdersService_1 = class OrdersService {
         return this.orders
             .createQueryBuilder('o')
             .where('o.status = :status', { status: order_entity_1.OrderStatus.BUILDING })
-            .andWhere('o.window_closes_at BETWEEN :start AND :end', {
+            .andWhere('o.pallet_deadline BETWEEN :start AND :end', {
             start: dayStart,
             end: target,
         })

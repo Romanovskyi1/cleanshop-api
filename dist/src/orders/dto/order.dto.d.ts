@@ -1,8 +1,11 @@
-import { OrderStatus } from '../entities/order.entity';
+import { OrderStatus, TruckType } from '../entities/order.entity';
 export declare class CreateOrderDto {
     proposedDate?: string;
+    truckType?: TruckType;
     truckCount?: number;
     notes?: string;
+}
+export declare class SubmitOrderDto {
 }
 export declare class ProposeDateDto {
     proposedDate: string;

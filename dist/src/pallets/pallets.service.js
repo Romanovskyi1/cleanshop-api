@@ -19,15 +19,21 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const pallet_entity_1 = require("./entities/pallet.entity");
 const truck_entity_1 = require("../orders/entities/truck.entity");
-const PALLET_MAX_BOXES = 40;
+const order_entity_1 = require("../orders/entities/order.entity");
+const PALLET_MAX_BOXES = 300;
 const PALLET_MAX_WEIGHT_KG = 1000;
+const TRUCK_LIMITS = {
+    [order_entity_1.TruckType.SMALL_5T]: { maxPallets: 12, maxWeightKg: 5_000 },
+    [order_entity_1.TruckType.LARGE_24T]: { maxPallets: 33, maxWeightKg: 24_000 },
+};
 const DEFAULT_BOX_WEIGHT_KG = 15;
 const DEFAULT_BOX_UNIT = 1;
 let PalletsService = PalletsService_1 = class PalletsService {
-    constructor(pallets, items, trucks, ds) {
+    constructor(pallets, items, trucks, orders, ds) {
         this.pallets = pallets;
         this.items = items;
         this.trucks = trucks;
+        this.orders = orders;
         this.ds = ds;
         this.logger = new common_1.Logger(PalletsService_1.name);
     }
@@ -58,7 +64,7 @@ let PalletsService = PalletsService_1 = class PalletsService {
         const pallet = this.pallets.create({
             companyId,
             orderId: dto.orderId ?? null,
-            name: dto.name ?? null,
+            name: dto.name ?? '',
             status: pallet_entity_1.PalletStatus.BUILDING,
         });
         return this.pallets.save(pallet);
@@ -67,7 +73,7 @@ let PalletsService = PalletsService_1 = class PalletsService {
         const pallet = await this.findOne(id, companyId);
         this.assertEditable(pallet);
         if (dto.name !== undefined)
-            pallet.name = dto.name;
+            pallet.name = dto.name ?? '';
         if (dto.truckId !== undefined) {
             await this.assignToTruck(pallet, dto.truckId);
         }
@@ -81,14 +87,26 @@ let PalletsService = PalletsService_1 = class PalletsService {
     }
     async addItem(palletId, companyId, dto, productData) {
         return this.ds.transaction(async (em) => {
-            const pallet = await em.findOne(pallet_entity_1.Pallet, {
+            const specifiedPallet = await em.findOne(pallet_entity_1.Pallet, {
                 where: { id: palletId, companyId },
                 relations: ['items'],
-                lock: { mode: 'pessimistic_write' },
             });
-            if (!pallet)
+            if (!specifiedPallet)
                 throw new common_1.NotFoundException(`Паллета #${palletId} не найдена`);
-            this.assertEditable(pallet);
+            this.assertEditable(specifiedPallet);
+            let pallet = specifiedPallet;
+            if (specifiedPallet.orderId) {
+                const orderPallets = await em.find(pallet_entity_1.Pallet, {
+                    where: { orderId: specifiedPallet.orderId, companyId },
+                    relations: ['items'],
+                });
+                const palletWithProduct = orderPallets.find(p => p.id !== specifiedPallet.id &&
+                    p.isEditable &&
+                    p.items.some(i => i.productId === dto.productId));
+                if (palletWithProduct) {
+                    pallet = palletWithProduct;
+                }
+            }
             if (dto.boxes % productData.unitsPerBox !== 0) {
                 throw new common_1.BadRequestException(`Количество коробок должно быть кратно ${productData.unitsPerBox}`);
             }
@@ -106,15 +124,31 @@ let PalletsService = PalletsService_1 = class PalletsService {
             if (newWeight > PALLET_MAX_WEIGHT_KG) {
                 throw new common_1.BadRequestException(`Превышен максимальный вес паллеты: ${newWeight.toFixed(0)} кг > ${PALLET_MAX_WEIGHT_KG} кг`);
             }
+            if (pallet.orderId) {
+                const order = await em.findOne(order_entity_1.Order, { where: { id: pallet.orderId } });
+                if (order?.truckType) {
+                    const limits = TRUCK_LIMITS[order.truckType];
+                    const orderPallets = await em.find(pallet_entity_1.Pallet, { where: { orderId: pallet.orderId } });
+                    const currentPallets = orderPallets.length;
+                    const currentOrderWeightKg = orderPallets.reduce((s, p) => s + Number(p.totalWeightKg), 0);
+                    const newOrderWeightKg = currentOrderWeightKg + dto.boxes * boxWeightKg;
+                    if (currentPallets > limits.maxPallets) {
+                        throw new common_1.BadRequestException(`Превышен лимит паллет: ${currentPallets} из ${limits.maxPallets}`);
+                    }
+                    if (newOrderWeightKg > limits.maxWeightKg) {
+                        throw new common_1.BadRequestException(`Превышен лимит веса грузовика: ${newOrderWeightKg.toFixed(0)}кг из ${limits.maxWeightKg}кг`);
+                    }
+                }
+            }
             let item = existingItem;
             if (item) {
-                item.boxes = dto.boxes;
+                item.boxes = item.boxes + dto.boxes;
                 item.priceEur = productData.priceEur;
-                item.subtotalEur = Number((productData.priceEur * dto.boxes).toFixed(2));
+                item.subtotalEur = Number((productData.priceEur * item.boxes).toFixed(2));
             }
             else {
                 item = em.create(pallet_entity_1.PalletItem, {
-                    palletId: palletId,
+                    palletId: pallet.id,
                     productId: dto.productId,
                     priceEur: productData.priceEur,
                     boxes: dto.boxes,
@@ -122,21 +156,55 @@ let PalletsService = PalletsService_1 = class PalletsService {
                 });
             }
             await em.save(pallet_entity_1.PalletItem, item);
-            await this.recalcPallet(em, palletId);
-            if (pallet.status === pallet_entity_1.PalletStatus.BUILDING && newTotalBoxes > 0) {
-                await em.update(pallet_entity_1.Pallet, palletId, { status: pallet_entity_1.PalletStatus.BUILDING });
-            }
+            await this.recalcPallet(em, pallet.id);
             return item;
         });
     }
-    async updateItem(palletId, itemId, companyId, dto, productData) {
+    async findItemById(itemId, palletId) {
         const item = await this.items.findOne({ where: { id: itemId, palletId } });
         if (!item)
             throw new common_1.NotFoundException(`Позиция #${itemId} не найдена`);
-        return this.addItem(palletId, companyId, {
-            productId: item.productId,
-            boxes: dto.boxes,
-        }, productData);
+        return item;
+    }
+    async updateItem(palletId, itemId, companyId, dto, productData) {
+        return this.ds.transaction(async (em) => {
+            const pallet = await em.findOne(pallet_entity_1.Pallet, {
+                where: { id: palletId, companyId },
+                relations: ['items'],
+            });
+            if (!pallet)
+                throw new common_1.NotFoundException(`Паллета #${palletId} не найдена`);
+            this.assertEditable(pallet);
+            const item = pallet.items.find(i => i.id === itemId);
+            if (!item)
+                throw new common_1.NotFoundException(`Позиция #${itemId} не найдена`);
+            const oldBoxes = item.boxes;
+            const newBoxes = dto.boxes;
+            const boxWeightKg = productData.weightPerBoxKg ?? DEFAULT_BOX_WEIGHT_KG;
+            if (newBoxes <= 0) {
+                await em.remove(pallet_entity_1.PalletItem, item);
+                await this.recalcPallet(em, palletId);
+                return item;
+            }
+            const currentBoxes = pallet.items.reduce((s, i) => s + i.boxes, 0);
+            const newTotalBoxes = currentBoxes - oldBoxes + newBoxes;
+            const currentWeight = Number(pallet.totalWeightKg);
+            const newWeight = currentWeight - oldBoxes * boxWeightKg + newBoxes * boxWeightKg;
+            if (newBoxes > oldBoxes) {
+                if (newTotalBoxes > PALLET_MAX_BOXES) {
+                    throw new common_1.BadRequestException(`Паллета переполнена: ${newTotalBoxes} кор. > максимум ${PALLET_MAX_BOXES} кор.`);
+                }
+                if (newWeight > PALLET_MAX_WEIGHT_KG) {
+                    throw new common_1.BadRequestException(`Превышен максимальный вес паллеты: ${newWeight.toFixed(0)} кг > ${PALLET_MAX_WEIGHT_KG} кг`);
+                }
+            }
+            item.boxes = newBoxes;
+            item.priceEur = productData.priceEur;
+            item.subtotalEur = Number((productData.priceEur * newBoxes).toFixed(2));
+            await em.save(pallet_entity_1.PalletItem, item);
+            await this.recalcPallet(em, palletId);
+            return item;
+        });
     }
     async removeItem(palletId, itemId, companyId) {
         return this.ds.transaction(async (em) => {
@@ -251,7 +319,7 @@ let PalletsService = PalletsService_1 = class PalletsService {
         const rows = await em
             .createQueryBuilder(pallet_entity_1.PalletItem, 'i')
             .select('SUM(i.boxes)', 'totalBoxes')
-            .addSelect('SUM(i.subtotal_eur)', 'totalAmountEur')
+            .addSelect('SUM(i.subtotal)', 'totalAmountEur')
             .where('i.pallet_id = :palletId', { palletId })
             .getRawOne();
         const totalBoxes = Number(rows?.totalBoxes ?? 0);
@@ -310,7 +378,9 @@ exports.PalletsService = PalletsService = PalletsService_1 = __decorate([
     __param(0, (0, typeorm_1.InjectRepository)(pallet_entity_1.Pallet)),
     __param(1, (0, typeorm_1.InjectRepository)(pallet_entity_1.PalletItem)),
     __param(2, (0, typeorm_1.InjectRepository)(truck_entity_1.Truck)),
+    __param(3, (0, typeorm_1.InjectRepository)(order_entity_1.Order)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.DataSource])

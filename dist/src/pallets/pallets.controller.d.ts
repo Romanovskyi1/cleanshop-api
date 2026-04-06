@@ -1,9 +1,12 @@
+import { Repository } from 'typeorm';
 import { PalletsService } from './pallets.service';
 import { CreatePalletDto, UpdatePalletDto, AddPalletItemDto, UpdatePalletItemDto, AssignPalletsToTruckDto, PalletQueryDto } from './dto/pallet.dto';
 import { User } from '../users/user.entity';
+import { Product } from '../products/entities/product.entity';
 export declare class PalletsController {
     private readonly service;
-    constructor(service: PalletsService);
+    private readonly products;
+    constructor(service: PalletsService, products: Repository<Product>);
     findAll(user: User, query: PalletQueryDto): Promise<import("./entities/pallet.entity").Pallet[]>;
     findOne(id: number, user: User): Promise<import("./entities/pallet.entity").Pallet>;
     create(user: User, dto: CreatePalletDto): Promise<import("./entities/pallet.entity").Pallet>;

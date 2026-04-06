@@ -260,4 +260,12 @@ export class ProductsService {
     if (!field) return '';
     return field[lang] ?? field['en'] ?? field['ru'] ?? '';
   }
+
+  async addImages(id: number, urls: string[]): Promise<Product> {
+    const product = await this.repo.findOne({ where: { id } });
+    if (!product) throw new NotFoundException(`Продукт #${id} не найден`);
+    product.images = [...(product.images ?? []), ...urls];
+    return this.repo.save(product);
+  }
+
 }

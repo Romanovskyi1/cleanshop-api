@@ -10,16 +10,16 @@ export declare enum DeliveryChannel {
     EMAIL = "email"
 }
 export declare enum DeliveryStatus {
-    PENDING = "pending",
     SENT = "sent",
-    FAILED = "failed"
+    FAILED = "failed",
+    RESENT = "resent"
 }
 export declare class Invoice {
     id: number;
     invoiceNumber: string;
     companyId: number;
     orderId: number | null;
-    issuedBy: number;
+    issuedAt: Date;
     dueDate: string;
     subtotalEur: number;
     vatRate: number;
@@ -27,7 +27,6 @@ export declare class Invoice {
     totalEur: number;
     status: InvoiceStatus;
     pdfUrl: string | null;
-    pdfS3Key: string | null;
     paidAt: Date | null;
     deliveries: InvoiceDelivery[];
     createdAt: Date;
@@ -43,8 +42,6 @@ export declare class InvoiceDelivery {
     recipient: string | null;
     errorMessage: string | null;
     sentAt: Date | null;
-    attempts: number;
-    externalId: string | null;
     createdAt: Date;
     updatedAt: Date;
 }

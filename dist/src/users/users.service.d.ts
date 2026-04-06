@@ -7,4 +7,6 @@ export declare class UsersService {
     findByTelegramId(telegramId: string): Promise<User | null>;
     findById(id: number): Promise<User | null>;
     upsert(tgUser: TelegramUser): Promise<User>;
+    findOrCreateByTelegramId(telegramId: string, firstName?: string): Promise<User>;
+    linkToCompany(userId: number, companyId: number): Promise<User>;
 }

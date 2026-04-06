@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateInvoices1700000006 = void 0;
-class CreateInvoices1700000006 {
+exports.CreateInvoices1700000006000 = void 0;
+class CreateInvoices1700000006000 {
     constructor() {
-        this.name = 'CreateInvoices1700000006';
+        this.name = 'CreateInvoices1700000006000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -115,5 +115,5 @@ class CreateInvoices1700000006 {
         await queryRunner.query(`DROP TYPE      IF EXISTS "invoice_status_enum"`);
     }
 }
-exports.CreateInvoices1700000006 = CreateInvoices1700000006;
+exports.CreateInvoices1700000006000 = CreateInvoices1700000006000;
 //# sourceMappingURL=1700000006-CreateInvoices.js.map

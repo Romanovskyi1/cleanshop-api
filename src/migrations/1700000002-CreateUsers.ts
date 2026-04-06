@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Пользователи авторизуются через Telegram InitData.
  * Каждый user привязан к company через company_id.
  */
-export class CreateUsers1700000002 implements MigrationInterface {
-  name = 'CreateUsers1700000002';
+export class CreateUsers1700000002000 implements MigrationInterface {
+  name = 'CreateUsers1700000002000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

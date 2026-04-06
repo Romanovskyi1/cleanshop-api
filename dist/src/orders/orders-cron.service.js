@@ -31,7 +31,7 @@ let OrdersCronService = OrdersCronService_1 = class OrdersCronService {
         for (const order of ordersToOpen) {
             try {
                 await this.orders.openPalletWindow(order.id);
-                await this.sendPush(order.companyId, this.buildOpenMsg(order.id, order.windowClosesAt));
+                await this.sendPush(order.companyId, this.buildOpenMsg(order.id, new Date()));
                 this.logger.log(`[Cron] Pallet window opened: order #${order.id}`);
             }
             catch (err) {
@@ -45,7 +45,7 @@ let OrdersCronService = OrdersCronService_1 = class OrdersCronService {
         for (const o of orders) {
             await this.sendPush(o.companyId, `⏳ <b>Напоминание о паллетах</b>\n\n` +
                 `Погрузка #${o.id}: осталось <b>2 дня</b> для сборки паллет.\n` +
-                `Дедлайн: ${this.fmtDate(o.windowClosesAt)}`).catch(e => this.logger.error(`Push failed: ${e.message}`));
+                `Дедлайн: ${this.fmtDate(new Date())}`).catch(e => this.logger.error(`Push failed: ${e.message}`));
         }
     }
     async remindOneDay() {

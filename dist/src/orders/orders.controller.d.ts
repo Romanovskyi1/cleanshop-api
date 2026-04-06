@@ -18,8 +18,13 @@ export declare class OrdersController {
     getHistory(id: number): Promise<import("./entities/order-status-history.entity").OrderStatusHistory[]>;
     create(user: User, dto: CreateOrderDto): Promise<import("./entities/order.entity").Order>;
     update(id: number, user: User, dto: UpdateOrderDto): Promise<import("./entities/order.entity").Order>;
+    remove(id: number, user: User): Promise<void>;
+    forceDelete(id: number): Promise<void>;
+    submit(id: number, user: User): Promise<import("./entities/order.entity").Order>;
+    clientCancel(id: number, user: User): Promise<import("./entities/order.entity").Order>;
     proposeDate(id: number, user: User, dto: ProposeDateDto): Promise<import("./entities/order.entity").Order>;
     confirmDate(id: number, manager: User, dto: ConfirmDateDto): Promise<import("./entities/order.entity").Order>;
+    openWindow(id: number, manager: User): Promise<import("./entities/order.entity").Order>;
     confirmPlan(id: number, user: User, dto: ConfirmPlanDto): Promise<import("./entities/order.entity").Order>;
     ship(id: number, manager: User, dto: ShipOrderDto): Promise<import("./entities/order.entity").Order>;
     cancel(id: number, manager: User, dto: CancelOrderDto): Promise<import("./entities/order.entity").Order>;

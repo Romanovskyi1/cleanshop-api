@@ -1,3 +1,7 @@
+export declare enum TruckType {
+    SMALL_5T = "small_5t",
+    LARGE_24T = "large_24t"
+}
 export declare enum OrderStatus {
     DRAFT = "draft",
     NEGOTIATING = "negotiating",
@@ -14,14 +18,12 @@ export declare class Order {
     proposedDate: string | null;
     confirmedDate: string | null;
     status: OrderStatus;
+    truckType: TruckType | null;
     proposedBy: number | null;
     confirmedBy: number | null;
-    lockedBy: number | null;
-    shippedBy: number | null;
     totalPallets: number;
     totalWeightKg: number | null;
     totalAmountEur: number | null;
-    truckCount: number;
     notes: string | null;
     windowOpensAt: Date | null;
     windowClosesAt: Date | null;

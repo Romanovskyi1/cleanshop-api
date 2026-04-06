@@ -1,11 +1,13 @@
 import { NestFactory }          from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join }                   from 'path';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService }          from '@nestjs/config';
 import helmet                     from 'helmet';
 import { AppModule }              from './app.module';
 
 async function bootstrap() {
-  const app    = await NestFactory.create(AppModule);
+  const app    = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
   const isProd = config.get('NODE_ENV') === 'production';
@@ -31,6 +33,7 @@ async function bootstrap() {
 
   // ── Global prefix ───────────────────────────────────────────────────
   app.setGlobalPrefix('api/v1');
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
 
   // ── Validation pipe ─────────────────────────────────────────────────
   // whitelist:   отбрасывает лишние поля из DTO

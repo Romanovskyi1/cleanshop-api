@@ -1,8 +1,10 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus,
+  Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, NotFoundException,
 } from '@nestjs/common';
-import { PalletsService }          from './pallets.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository }       from 'typeorm';
+import { PalletsService }   from './pallets.service';
 import {
   CreatePalletDto, UpdatePalletDto,
   AddPalletItemDto, UpdatePalletItemDto,
@@ -10,15 +12,15 @@ import {
 } from './dto/pallet.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User }        from '../users/user.entity';
-
-// ──────────────────────────────────────────────────────────────────────────────
-// ПРИМЕЧАНИЕ: ProductsService инжектируется для получения цены и кратности.
-// В реальном коде замените заглушку на реальный ProductsService.
-// ──────────────────────────────────────────────────────────────────────────────
+import { Product }     from '../products/entities/product.entity';
 
 @Controller('pallets')
 export class PalletsController {
-  constructor(private readonly service: PalletsService) {}
+  constructor(
+    private readonly service: PalletsService,
+    @InjectRepository(Product)
+    private readonly products: Repository<Product>,
+  ) {}
 
   // ── Паллеты ──────────────────────────────────────────────────────────────
 
@@ -92,19 +94,17 @@ export class PalletsController {
    * из ProductsService. Здесь передаём через body для простоты MVP.
    */
   @Post(':id/items')
-  addItem(
+  async addItem(
     @Param('id', ParseIntPipe) palletId: number,
     @CurrentUser() user: User,
     @Body() dto: AddPalletItemDto,
-    // В реальном коде: @Body('price') price и т.д. берутся из ProductsService
-    // Здесь упрощённо — ProductsService внедрить в сервис и вызвать там
   ) {
-    // TODO: получить productData из ProductsService
-    // const product = await this.productsService.findOne(dto.productId);
+    const product = await this.products.findOne({ where: { id: dto.productId } });
+    if (!product) throw new NotFoundException(`Товар #${dto.productId} не найден`);
     const productData = {
-      priceEur:       12.40, // REPLACE: product.priceEur
-      unitsPerBox:    24,    // REPLACE: product.unitsPerBox
-      weightPerBoxKg: 15,    // REPLACE: product.weightPerBoxKg
+      priceEur:       Number(product.priceEur),
+      unitsPerBox:    product.unitsPerBox,
+      weightPerBoxKg: product.boxWeightKg ? Number(product.boxWeightKg) : undefined,
     };
     return this.service.addItem(palletId, user.companyId, dto, productData);
   }
@@ -114,16 +114,19 @@ export class PalletsController {
    * Изменить количество коробок.
    */
   @Patch(':id/items/:itemId')
-  updateItem(
+  async updateItem(
     @Param('id',     ParseIntPipe) palletId: number,
     @Param('itemId', ParseIntPipe) itemId: number,
     @CurrentUser() user: User,
     @Body() dto: UpdatePalletItemDto,
   ) {
+    const item = await this.service.findItemById(itemId, palletId);
+    const product = await this.products.findOne({ where: { id: item.productId } });
+    if (!product) throw new NotFoundException(`Товар #${item.productId} не найден`);
     const productData = {
-      priceEur:       12.40, // REPLACE
-      unitsPerBox:    24,    // REPLACE
-      weightPerBoxKg: 15,    // REPLACE
+      priceEur:       Number(product.priceEur),
+      unitsPerBox:    product.unitsPerBox,
+      weightPerBoxKg: product.boxWeightKg ? Number(product.boxWeightKg) : undefined,
     };
     return this.service.updateItem(palletId, itemId, user.companyId, dto, productData);
   }

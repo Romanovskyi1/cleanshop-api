@@ -6,8 +6,6 @@ export declare class Truck {
     number: number;
     maxPallets: number;
     maxWeightKg: number;
-    licensePlate: string | null;
-    driverName: string | null;
     createdAt: Date;
     get displayName(): string;
 }

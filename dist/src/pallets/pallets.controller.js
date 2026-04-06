@@ -14,13 +14,17 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PalletsController = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
+const typeorm_2 = require("typeorm");
 const pallets_service_1 = require("./pallets.service");
 const pallet_dto_1 = require("./dto/pallet.dto");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
 const user_entity_1 = require("../users/user.entity");
+const product_entity_1 = require("../products/entities/product.entity");
 let PalletsController = class PalletsController {
-    constructor(service) {
+    constructor(service, products) {
         this.service = service;
+        this.products = products;
     }
     findAll(user, query) {
         return this.service.findAll(user.companyId, query);
@@ -37,19 +41,26 @@ let PalletsController = class PalletsController {
     remove(id, user) {
         return this.service.remove(id, user.companyId);
     }
-    addItem(palletId, user, dto) {
+    async addItem(palletId, user, dto) {
+        const product = await this.products.findOne({ where: { id: dto.productId } });
+        if (!product)
+            throw new common_1.NotFoundException(`Товар #${dto.productId} не найден`);
         const productData = {
-            priceEur: 12.40,
-            unitsPerBox: 24,
-            weightPerBoxKg: 15,
+            priceEur: Number(product.priceEur),
+            unitsPerBox: product.unitsPerBox,
+            weightPerBoxKg: product.boxWeightKg ? Number(product.boxWeightKg) : undefined,
         };
         return this.service.addItem(palletId, user.companyId, dto, productData);
     }
-    updateItem(palletId, itemId, user, dto) {
+    async updateItem(palletId, itemId, user, dto) {
+        const item = await this.service.findItemById(itemId, palletId);
+        const product = await this.products.findOne({ where: { id: item.productId } });
+        if (!product)
+            throw new common_1.NotFoundException(`Товар #${item.productId} не найден`);
         const productData = {
-            priceEur: 12.40,
-            unitsPerBox: 24,
-            weightPerBoxKg: 15,
+            priceEur: Number(product.priceEur),
+            unitsPerBox: product.unitsPerBox,
+            weightPerBoxKg: product.boxWeightKg ? Number(product.boxWeightKg) : undefined,
         };
         return this.service.updateItem(palletId, itemId, user.companyId, dto, productData);
     }
@@ -123,7 +134,7 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, user_entity_1.User,
         pallet_dto_1.AddPalletItemDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], PalletsController.prototype, "addItem", null);
 __decorate([
     (0, common_1.Patch)(':id/items/:itemId'),
@@ -134,7 +145,7 @@ __decorate([
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Number, Number, user_entity_1.User,
         pallet_dto_1.UpdatePalletItemDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], PalletsController.prototype, "updateItem", null);
 __decorate([
     (0, common_1.Delete)(':id/items/:itemId'),
@@ -184,6 +195,8 @@ __decorate([
 ], PalletsController.prototype, "removeFromTruck", null);
 exports.PalletsController = PalletsController = __decorate([
     (0, common_1.Controller)('pallets'),
-    __metadata("design:paramtypes", [pallets_service_1.PalletsService])
+    __param(1, (0, typeorm_1.InjectRepository)(product_entity_1.Product)),
+    __metadata("design:paramtypes", [pallets_service_1.PalletsService,
+        typeorm_2.Repository])
 ], PalletsController);
 //# sourceMappingURL=pallets.controller.js.map

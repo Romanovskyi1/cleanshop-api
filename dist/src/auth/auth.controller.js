@@ -64,6 +64,10 @@ let AuthController = AuthController_1 = class AuthController {
     checkManager(user) {
         return { ok: true, role: user.role };
     }
+    async login(dto) {
+        const result = await this.authService.loginWithCredentials(dto.username, dto.password);
+        return result;
+    }
     async devLogin(body) {
         const result = await this.authService.devLogin(body.telegramId);
         return {
@@ -129,6 +133,15 @@ __decorate([
     __metadata("design:paramtypes", [user_entity_1.User]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "checkManager", null);
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Post)('login'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.CredentialsLoginDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "login", null);
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Post)('dev-login'),

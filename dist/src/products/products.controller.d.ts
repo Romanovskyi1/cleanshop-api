@@ -25,4 +25,5 @@ export declare class ProductsController {
     update(id: number, dto: UpdateProductDto): Promise<import("./entities/product.entity").Product>;
     updateStock(id: number, stockPallets: number): Promise<void>;
     remove(id: number): Promise<void>;
+    uploadImages(id: number, files: Express.Multer.File[]): Promise<import("./entities/product.entity").Product>;
 }

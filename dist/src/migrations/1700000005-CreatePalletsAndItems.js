@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreatePalletsAndItems1700000005 = void 0;
-class CreatePalletsAndItems1700000005 {
+exports.CreatePalletsAndItems1700000005000 = void 0;
+class CreatePalletsAndItems1700000005000 {
     constructor() {
-        this.name = 'CreatePalletsAndItems1700000005';
+        this.name = 'CreatePalletsAndItems1700000005000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -172,5 +172,5 @@ class CreatePalletsAndItems1700000005 {
         await queryRunner.query(`DROP TYPE  IF EXISTS "pallet_status_enum"`);
     }
 }
-exports.CreatePalletsAndItems1700000005 = CreatePalletsAndItems1700000005;
+exports.CreatePalletsAndItems1700000005000 = CreatePalletsAndItems1700000005000;
 //# sourceMappingURL=1700000005-CreatePalletsAndItems.js.map

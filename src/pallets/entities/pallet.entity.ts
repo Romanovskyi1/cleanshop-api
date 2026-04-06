@@ -26,7 +26,7 @@ export class Pallet {
   @Column({ name: 'truck_id', nullable: true })
   truckId: number | null;
 
-  @Column({ nullable: true, length: 100 })
+  @Column({ nullable: false, length: 100, default: '' })
   name: string;
 
   @Column({ name: 'total_boxes', default: 0 })
@@ -86,7 +86,7 @@ export class PalletItem {
   @Column({ name: 'boxes' })
   boxes: number;
 
-  @Column({ name: 'subtotal_eur', type: 'decimal', precision: 14, scale: 2 })
+  @Column({ name: 'subtotal', type: 'decimal', precision: 14, scale: 2, insert: false, update: false })
   subtotalEur: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

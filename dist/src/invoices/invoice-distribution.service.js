@@ -97,8 +97,7 @@ let InvoiceDistributionService = InvoiceDistributionService_1 = class InvoiceDis
         const delivery = await this.deliveries.save(this.deliveries.create({
             invoiceId: invoice.id,
             channel,
-            status: invoice_entity_1.DeliveryStatus.PENDING,
-            attempts: 1,
+            status: invoice_entity_1.DeliveryStatus.SENT,
         }));
         try {
             let result;
@@ -143,7 +142,6 @@ let InvoiceDistributionService = InvoiceDistributionService_1 = class InvoiceDis
                 throw new Error(result.error ?? 'Delivery failed');
             await this.deliveries.update(delivery.id, {
                 status: invoice_entity_1.DeliveryStatus.SENT,
-                externalId: String(result.messageId ?? ''),
                 sentAt: new Date(),
             });
             this.logger.log(`[invoice:${invoice.id}] Channel ${channel} → SENT`);

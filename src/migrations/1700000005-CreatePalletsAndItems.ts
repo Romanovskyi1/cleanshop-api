@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   пересчитывает pallets.total_boxes и pallets.total_weight_kg.
  *   Это снимает нагрузку с приложения и гарантирует консистентность.
  */
-export class CreatePalletsAndItems1700000005 implements MigrationInterface {
-  name = 'CreatePalletsAndItems1700000005';
+export class CreatePalletsAndItems1700000005000 implements MigrationInterface {
+  name = 'CreatePalletsAndItems1700000005000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

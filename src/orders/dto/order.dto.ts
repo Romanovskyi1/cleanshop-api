@@ -4,13 +4,17 @@ import {
   IsString, MaxLength, IsEnum, IsIn, Min, Max,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { OrderStatus }     from '../entities/order.entity';
+import { OrderStatus, TruckType } from '../entities/order.entity';
 
 // ── Создать заказ (черновик) ─────────────────────────────────────────────────
 export class CreateOrderDto {
   @IsOptional()
   @IsDateString()
   proposedDate?: string; // YYYY-MM-DD
+
+  @IsOptional()
+  @IsEnum(TruckType)
+  truckType?: TruckType; // small_5t | large_24t
 
   @IsOptional()
   @IsInt()
@@ -24,6 +28,9 @@ export class CreateOrderDto {
   @MaxLength(1000)
   notes?: string;
 }
+
+// ── Отправить черновик менеджеру (клиент, без даты) ─────────────────────────
+export class SubmitOrderDto {}
 
 // ── Предложить / изменить дату погрузки (клиент) ────────────────────────────
 export class ProposeDateDto {

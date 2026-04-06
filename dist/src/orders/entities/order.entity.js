@@ -9,8 +9,13 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Order = exports.ALLOWED_TRANSITIONS = exports.OrderStatus = void 0;
+exports.Order = exports.ALLOWED_TRANSITIONS = exports.OrderStatus = exports.TruckType = void 0;
 const typeorm_1 = require("typeorm");
+var TruckType;
+(function (TruckType) {
+    TruckType["SMALL_5T"] = "small_5t";
+    TruckType["LARGE_24T"] = "large_24t";
+})(TruckType || (exports.TruckType = TruckType = {}));
 var OrderStatus;
 (function (OrderStatus) {
     OrderStatus["DRAFT"] = "draft";
@@ -32,10 +37,11 @@ exports.ALLOWED_TRANSITIONS = {
 };
 let Order = class Order {
     get isPalletWindowOpen() {
-        if (!this.windowOpensAt || !this.windowClosesAt)
+        if (this.status !== OrderStatus.BUILDING)
             return false;
-        const now = new Date();
-        return now >= this.windowOpensAt && now <= this.windowClosesAt;
+        if (!this.windowClosesAt)
+            return true;
+        return new Date() <= new Date(this.windowClosesAt);
     }
     get isEditable() {
         return ![OrderStatus.SHIPPED, OrderStatus.CANCELLED].includes(this.status);
@@ -71,21 +77,22 @@ __decorate([
     __metadata("design:type", String)
 ], Order.prototype, "status", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'proposed_by', nullable: true }),
+    (0, typeorm_1.Column)({
+        name: 'truck_type',
+        type: 'enum',
+        enum: TruckType,
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], Order.prototype, "truckType", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'proposed_by_id', nullable: true }),
     __metadata("design:type", Number)
 ], Order.prototype, "proposedBy", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'confirmed_by', nullable: true }),
+    (0, typeorm_1.Column)({ name: 'confirmed_by_id', nullable: true }),
     __metadata("design:type", Number)
 ], Order.prototype, "confirmedBy", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'locked_by', nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "lockedBy", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'shipped_by', nullable: true }),
-    __metadata("design:type", Number)
-], Order.prototype, "shippedBy", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'total_pallets', default: 0 }),
     __metadata("design:type", Number)
@@ -111,27 +118,15 @@ __decorate([
     __metadata("design:type", Number)
 ], Order.prototype, "totalAmountEur", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'truck_count', default: 1 }),
-    __metadata("design:type", Number)
-], Order.prototype, "truckCount", void 0);
-__decorate([
     (0, typeorm_1.Column)({ nullable: true, length: 1000 }),
     __metadata("design:type", String)
 ], Order.prototype, "notes", void 0);
 __decorate([
-    (0, typeorm_1.Column)({
-        name: 'window_opens_at',
-        type: 'timestamptz',
-        nullable: true,
-    }),
+    (0, typeorm_1.Column)({ name: 'window_opens_at', type: 'timestamptz', nullable: true }),
     __metadata("design:type", Date)
 ], Order.prototype, "windowOpensAt", void 0);
 __decorate([
-    (0, typeorm_1.Column)({
-        name: 'window_closes_at',
-        type: 'timestamptz',
-        nullable: true,
-    }),
+    (0, typeorm_1.Column)({ name: 'pallet_deadline', type: 'timestamptz', nullable: true }),
     __metadata("design:type", Date)
 ], Order.prototype, "windowClosesAt", void 0);
 __decorate([

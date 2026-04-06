@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateOrdersAndTrucks1700000004 = void 0;
-class CreateOrdersAndTrucks1700000004 {
+exports.CreateOrdersAndTrucks1700000004000 = void 0;
+class CreateOrdersAndTrucks1700000004000 {
     constructor() {
-        this.name = 'CreateOrdersAndTrucks1700000004';
+        this.name = 'CreateOrdersAndTrucks1700000004000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -36,12 +36,8 @@ class CreateOrdersAndTrucks1700000004 {
         -- Статус
         "status"              "order_status_enum" NOT NULL DEFAULT 'draft',
 
-        -- Дедлайн для сборки паллет (confirmed_date - 1 день в 23:59)
-        "pallet_deadline"     TIMESTAMPTZ
-          GENERATED ALWAYS AS (
-            ("confirmed_date" - INTERVAL '1 day')::TIMESTAMPTZ
-            + INTERVAL '23 hours 59 minutes'
-          ) STORED,
+        -- Дедлайн для сборки паллет (вычисляется на уровне сервиса)
+        "pallet_deadline"     TIMESTAMPTZ,
 
         -- Итоги (обновляются триггером при изменении паллет)
         "total_pallets"       INTEGER             NOT NULL DEFAULT 0,
@@ -102,5 +98,5 @@ class CreateOrdersAndTrucks1700000004 {
         await queryRunner.query(`DROP TYPE IF EXISTS "order_status_enum"`);
     }
 }
-exports.CreateOrdersAndTrucks1700000004 = CreateOrdersAndTrucks1700000004;
+exports.CreateOrdersAndTrucks1700000004000 = CreateOrdersAndTrucks1700000004000;
 //# sourceMappingURL=1700000004-CreateOrdersAndTrucks.js.map

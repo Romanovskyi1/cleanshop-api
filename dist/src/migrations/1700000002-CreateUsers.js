@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateUsers1700000002 = void 0;
-class CreateUsers1700000002 {
+exports.CreateUsers1700000002000 = void 0;
+class CreateUsers1700000002000 {
     constructor() {
-        this.name = 'CreateUsers1700000002';
+        this.name = 'CreateUsers1700000002000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -47,5 +47,5 @@ class CreateUsers1700000002 {
         await queryRunner.query(`DROP TYPE IF EXISTS "user_role_enum"`);
     }
 }
-exports.CreateUsers1700000002 = CreateUsers1700000002;
+exports.CreateUsers1700000002000 = CreateUsers1700000002000;
 //# sourceMappingURL=1700000002-CreateUsers.js.map

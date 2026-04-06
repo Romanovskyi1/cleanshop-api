@@ -26,6 +26,11 @@ import {
 //
 //   Любой статус → cancelled  (только менеджер/admin)
 
+export enum TruckType {
+  SMALL_5T  = 'small_5t',   // 5-тонный малый
+  LARGE_24T = 'large_24t',  // 24-тонный большой
+}
+
 export enum OrderStatus {
   DRAFT       = 'draft',
   NEGOTIATING = 'negotiating',
@@ -75,21 +80,22 @@ export class Order {
   })
   status: OrderStatus;
 
+  /** Тип грузовика, выбранный клиентом при создании заказа */
+  @Column({
+    name:     'truck_type',
+    type:     'enum',
+    enum:     TruckType,
+    nullable: true,
+  })
+  truckType: TruckType | null;
+
   /** Кто предложил дату */
-  @Column({ name: 'proposed_by', nullable: true })
+  @Column({ name: 'proposed_by_id', nullable: true })
   proposedBy: number | null;
 
   /** Кто подтвердил дату (менеджер) */
-  @Column({ name: 'confirmed_by', nullable: true })
+  @Column({ name: 'confirmed_by_id', nullable: true })
   confirmedBy: number | null;
-
-  /** Кто зафиксировал план паллет */
-  @Column({ name: 'locked_by', nullable: true })
-  lockedBy: number | null;
-
-  /** Кто отметил отгрузку */
-  @Column({ name: 'shipped_by', nullable: true })
-  shippedBy: number | null;
 
   @Column({ name: 'total_pallets', default: 0 })
   totalPallets: number;
@@ -112,25 +118,15 @@ export class Order {
   })
   totalAmountEur: number | null;
 
-  /** Количество фур */
-  @Column({ name: 'truck_count', default: 1 })
-  truckCount: number;
-
   @Column({ nullable: true, length: 1000 })
   notes: string | null;
 
-  @Column({
-    name:      'window_opens_at',
-    type:      'timestamptz',
-    nullable:  true,
-  })
+  /** Когда открывается окно редактирования паллет (за 5 дней до погрузки) */
+  @Column({ name: 'window_opens_at', type: 'timestamptz', nullable: true })
   windowOpensAt: Date | null;
 
-  @Column({
-    name:      'window_closes_at',
-    type:      'timestamptz',
-    nullable:  true,
-  })
+  /** Когда закрывается окно паллет (за 1 день до погрузки в 23:59) */
+  @Column({ name: 'pallet_deadline', type: 'timestamptz', nullable: true })
   windowClosesAt: Date | null;
 
   @Column({ name: 'shipped_at', type: 'timestamptz', nullable: true })
@@ -146,9 +142,11 @@ export class Order {
 
   /** Окно редактирования паллет открыто прямо сейчас */
   get isPalletWindowOpen(): boolean {
-    if (!this.windowOpensAt || !this.windowClosesAt) return false;
-    const now = new Date();
-    return now >= this.windowOpensAt && now <= this.windowClosesAt;
+    // Если заказ в статусе building — окно открыто (менеджер мог открыть вручную)
+    // Проверяем только что дедлайн не истёк
+    if (this.status !== OrderStatus.BUILDING) return false;
+    if (!this.windowClosesAt) return true;
+    return new Date() <= new Date(this.windowClosesAt);
   }
 
   /** Заказ ещё можно редактировать */

@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   Используется для отображения колокольчика в TMA
  *   и истории уведомлений.
  */
-export class CreateChatAndNotifications1700000007 implements MigrationInterface {
-  name = 'CreateChatAndNotifications1700000007';
+export class CreateChatAndNotifications1700000007000 implements MigrationInterface {
+  name = 'CreateChatAndNotifications1700000007000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 

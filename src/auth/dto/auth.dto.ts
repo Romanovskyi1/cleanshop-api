@@ -12,3 +12,8 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken: string;
 }
+
+export class CredentialsLoginDto {
+  @IsString() @IsNotEmpty() username: string;
+  @IsString() @IsNotEmpty() password: string;
+}

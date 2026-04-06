@@ -7,18 +7,48 @@ import { CompaniesService }  from './companies.service';
 import {
   CreateCompanyDto, UpdateCompanyDto, SetGroupChatDto,
 } from './dto/company.dto';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles }       from '../common/decorators/roles.decorator';
-import { User, UserRole } from '../users/user.entity';
+import { UsersService }    from '../users/users.service';
+import { CurrentUser }     from '../common/decorators/current-user.decorator';
+import { Roles }           from '../common/decorators/roles.decorator';
+import { User, UserRole }  from '../users/user.entity';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, Length } from 'class-validator';
+
+class RegisterClientDto {
+  @IsString()
+  @IsNotEmpty()
+  companyName: string;
+
+  @IsString()
+  @Length(2, 2)
+  countryCode: string;
+
+  @IsString()
+  @IsNotEmpty()
+  telegramId: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  vatNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+}
 
 @Controller('companies')
 export class CompaniesController {
-  constructor(private readonly service: CompaniesService) {}
+  constructor(
+    private readonly service: CompaniesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   /**
    * GET /companies
    * Список всех компаний.
-   * Клиент получает только свою — проверяем companyId из токена.
    */
   @Get()
   @Roles(UserRole.MANAGER)
@@ -36,6 +66,30 @@ export class CompaniesController {
       return null;
     }
     return this.service.findById(user.companyId);
+  }
+
+  /**
+   * POST /companies/register-client
+   * Менеджер регистрирует нового клиента: создаёт компанию и привязывает пользователя.
+   */
+  @Post('register-client')
+  @Roles(UserRole.MANAGER)
+  async registerClient(@Body() dto: RegisterClientDto) {
+    const company = await this.service.create({
+      name:               dto.companyName,
+      countryCode:        dto.countryCode,
+      vatNumber:          dto.vatNumber,
+      invoiceEmail:       dto.email,
+      primaryContactName: dto.contactName,
+    });
+
+    const user = await this.usersService.findOrCreateByTelegramId(
+      dto.telegramId,
+      dto.contactName,
+    );
+    await this.usersService.linkToCompany(user.id, company.id);
+
+    return { company, userId: user.id };
   }
 
   /**
@@ -59,7 +113,7 @@ export class CompaniesController {
 
   /**
    * PATCH /companies/:id
-   * Обновить реквизиты (manager — для своих клиентов, admin — для любой).
+   * Обновить реквизиты.
    */
   @Patch(':id')
   @Roles(UserRole.MANAGER)
@@ -73,13 +127,6 @@ export class CompaniesController {
   /**
    * PATCH /companies/:id/group-chat
    * Привязать Telegram-группу.
-   * Это отдельный endpoint — изменение влияет на рассылку инвойсов.
-   *
-   * Как узнать groupChatId:
-   *  1. Добавить бота в группу
-   *  2. Написать любое сообщение
-   *  3. GET https://api.telegram.org/bot{TOKEN}/getUpdates
-   *  4. В ответе найти message.chat.id (отрицательное число)
    */
   @Patch(':id/group-chat')
   @Roles(UserRole.MANAGER)

@@ -17,9 +17,9 @@ export enum DeliveryChannel {
 }
 
 export enum DeliveryStatus {
-  PENDING = 'pending',
-  SENT    = 'sent',
-  FAILED  = 'failed',
+  SENT   = 'sent',
+  FAILED = 'failed',
+  RESENT = 'resent',
 }
 
 @Entity('invoices')
@@ -39,8 +39,8 @@ export class Invoice {
   @Column({ name: 'order_id', nullable: true })
   orderId: number | null;
 
-  @Column({ name: 'issued_by' })
-  issuedBy: number;
+  @CreateDateColumn({ name: 'issued_at', type: 'timestamptz' })
+  issuedAt: Date;
 
   @Column({ name: 'due_date', type: 'date' })
   dueDate: string;
@@ -62,9 +62,6 @@ export class Invoice {
 
   @Column({ name: 'pdf_url', nullable: true })
   pdfUrl: string | null;
-
-  @Column({ name: 'pdf_s3_key', nullable: true })
-  pdfS3Key: string | null;
 
   @Column({ name: 'paid_at', type: 'timestamptz', nullable: true })
   paidAt: Date | null;
@@ -97,23 +94,17 @@ export class InvoiceDelivery {
   @Column({ type: 'enum', enum: DeliveryChannel })
   channel: DeliveryChannel;
 
-  @Column({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.PENDING })
+  @Column({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.SENT })
   status: DeliveryStatus;
 
   @Column({ name: 'recipient', nullable: true })
   recipient: string | null;
 
-  @Column({ name: 'error_message', type: 'text', nullable: true })
+  @Column({ name: 'error', type: 'text', nullable: true })
   errorMessage: string | null;
 
   @Column({ name: 'sent_at', type: 'timestamptz', nullable: true })
   sentAt: Date | null;
-
-  @Column({ name: 'attempts', default: 0 })
-  attempts: number;
-
-  @Column({ name: 'external_id', nullable: true })
-  externalId: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

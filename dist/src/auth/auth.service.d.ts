@@ -21,6 +21,18 @@ export declare class AuthService {
     private verifyInitData;
     private signAccess;
     private signRefresh;
+    loginWithCredentials(username: string, password: string): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        user: {
+            id: number;
+            telegramId: string;
+            displayName: string;
+            role: string;
+            companyId: number | null;
+            languageCode: string;
+        };
+    }>;
     devLogin(telegramId: string): Promise<{
         accessToken: string;
         refreshToken: string;

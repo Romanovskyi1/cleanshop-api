@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateProducts1700000003 = void 0;
-class CreateProducts1700000003 {
+exports.CreateProducts1700000003000 = void 0;
+class CreateProducts1700000003000 {
     constructor() {
-        this.name = 'CreateProducts1700000003';
+        this.name = 'CreateProducts1700000003000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -80,5 +80,5 @@ class CreateProducts1700000003 {
         await queryRunner.query(`DROP TYPE IF EXISTS "product_category_enum"`);
     }
 }
-exports.CreateProducts1700000003 = CreateProducts1700000003;
+exports.CreateProducts1700000003000 = CreateProducts1700000003000;
 //# sourceMappingURL=1700000003-CreateProducts.js.map

@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateChatAndNotifications1700000007 = void 0;
-class CreateChatAndNotifications1700000007 {
+exports.CreateChatAndNotifications1700000007000 = void 0;
+class CreateChatAndNotifications1700000007000 {
     constructor() {
-        this.name = 'CreateChatAndNotifications1700000007';
+        this.name = 'CreateChatAndNotifications1700000007000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -89,5 +89,5 @@ class CreateChatAndNotifications1700000007 {
         await queryRunner.query(`DROP TYPE  IF EXISTS "sender_type_enum"`);
     }
 }
-exports.CreateChatAndNotifications1700000007 = CreateChatAndNotifications1700000007;
+exports.CreateChatAndNotifications1700000007000 = CreateChatAndNotifications1700000007000;
 //# sourceMappingURL=1700000007-CreateChatAndNotifications.js.map

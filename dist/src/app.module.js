@@ -16,9 +16,19 @@ const auth_module_1 = require("./auth/auth.module");
 const users_module_1 = require("./users/users.module");
 const products_module_1 = require("./products/products.module");
 const companies_module_1 = require("./companies/companies.module");
+const orders_module_1 = require("./orders/orders.module");
+const pallets_module_1 = require("./pallets/pallets.module");
+const invoices_module_1 = require("./invoices/invoices.module");
+const chat_module_1 = require("./chat/chat.module");
 const user_entity_1 = require("./users/user.entity");
 const product_entity_1 = require("./products/entities/product.entity");
 const company_entity_1 = require("./companies/entities/company.entity");
+const order_entity_1 = require("./orders/entities/order.entity");
+const order_status_history_entity_1 = require("./orders/entities/order-status-history.entity");
+const truck_entity_1 = require("./orders/entities/truck.entity");
+const pallet_entity_1 = require("./pallets/entities/pallet.entity");
+const invoice_entity_1 = require("./invoices/entities/invoice.entity");
+const chat_message_entity_1 = require("./chat/entities/chat-message.entity");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -35,7 +45,7 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (config) => ({
                     type: 'postgres',
                     url: config.getOrThrow('DATABASE_URL'),
-                    entities: [user_entity_1.User, product_entity_1.Product, company_entity_1.Company],
+                    entities: [user_entity_1.User, product_entity_1.Product, company_entity_1.Company, order_entity_1.Order, order_status_history_entity_1.OrderStatusHistory, truck_entity_1.Truck, pallet_entity_1.Pallet, pallet_entity_1.PalletItem, invoice_entity_1.Invoice, invoice_entity_1.InvoiceDelivery, chat_message_entity_1.ChatMessage],
                     synchronize: config.get('NODE_ENV') === 'development',
                     logging: config.get('NODE_ENV') === 'development',
                     ssl: config.get('NODE_ENV') === 'production'
@@ -55,6 +65,10 @@ exports.AppModule = AppModule = __decorate([
             auth_module_1.AuthModule,
             products_module_1.ProductsModule,
             companies_module_1.CompaniesModule,
+            orders_module_1.OrdersModule,
+            pallets_module_1.PalletsModule,
+            invoices_module_1.InvoicesModule,
+            chat_module_1.ChatModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },

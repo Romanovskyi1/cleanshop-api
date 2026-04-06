@@ -8,9 +8,19 @@ import { AuthModule }  from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
 import { CompaniesModule } from './companies/companies.module';
+import { OrdersModule } from './orders/orders.module';
+import { PalletsModule } from './pallets/pallets.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { ChatModule } from './chat/chat.module';
 import { User }        from './users/user.entity';
 import { Product }     from './products/entities/product.entity';
 import { Company }     from './companies/entities/company.entity';
+import { Order }       from './orders/entities/order.entity';
+import { OrderStatusHistory } from './orders/entities/order-status-history.entity';
+import { Truck }       from './orders/entities/truck.entity';
+import { Pallet, PalletItem } from './pallets/entities/pallet.entity';
+import { Invoice, InvoiceDelivery } from './invoices/entities/invoice.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
 
 @Module({
   imports: [
@@ -27,7 +37,7 @@ import { Company }     from './companies/entities/company.entity';
       useFactory: (config: ConfigService) => ({
         type:        'postgres',
         url:         config.getOrThrow<string>('DATABASE_URL'),
-        entities:    [User, Product, Company],   // добавлять по мере создания сущностей
+        entities:    [User, Product, Company, Order, OrderStatusHistory, Truck, Pallet, PalletItem, Invoice, InvoiceDelivery, ChatMessage],   // добавлять по мере создания сущностей
         synchronize: config.get('NODE_ENV') === 'development', // ТОЛЬКО dev
         logging:     config.get('NODE_ENV') === 'development',
         ssl: config.get('NODE_ENV') === 'production'
@@ -51,10 +61,10 @@ import { Company }     from './companies/entities/company.entity';
     AuthModule,
     ProductsModule,
     CompaniesModule,
-    // OrdersModule,     ← добавишь в День 3
-    // PalletsModule,    ← добавишь в День 3
-    // InvoicesModule,   ← Фаза 2
-    // ChatModule,       ← Фаза 2
+    OrdersModule,
+    PalletsModule,
+    InvoicesModule,
+    ChatModule,
   ],
   providers: [
     // Глобальный rate-limit guard

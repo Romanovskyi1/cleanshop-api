@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RefreshTokenDto = exports.TelegramAuthDto = void 0;
+exports.CredentialsLoginDto = exports.RefreshTokenDto = exports.TelegramAuthDto = void 0;
 const class_validator_1 = require("class-validator");
 class TelegramAuthDto {
 }
@@ -28,4 +28,17 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], RefreshTokenDto.prototype, "refreshToken", void 0);
+class CredentialsLoginDto {
+}
+exports.CredentialsLoginDto = CredentialsLoginDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], CredentialsLoginDto.prototype, "username", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], CredentialsLoginDto.prototype, "password", void 0);
 //# sourceMappingURL=auth.dto.js.map

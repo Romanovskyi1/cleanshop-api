@@ -30,4 +30,5 @@ export declare class ProductsService {
     private applySorting;
     private toListItem;
     private localise;
+    addImages(id: number, urls: string[]): Promise<Product>;
 }

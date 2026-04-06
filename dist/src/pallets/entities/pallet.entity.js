@@ -46,7 +46,7 @@ __decorate([
     __metadata("design:type", Number)
 ], Pallet.prototype, "truckId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ nullable: true, length: 100 }),
+    (0, typeorm_1.Column)({ nullable: false, length: 100, default: '' }),
     __metadata("design:type", String)
 ], Pallet.prototype, "name", void 0);
 __decorate([
@@ -110,7 +110,7 @@ __decorate([
     __metadata("design:type", Number)
 ], PalletItem.prototype, "boxes", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'subtotal_eur', type: 'decimal', precision: 14, scale: 2 }),
+    (0, typeorm_1.Column)({ name: 'subtotal', type: 'decimal', precision: 14, scale: 2, insert: false, update: false }),
     __metadata("design:type", Number)
 ], PalletItem.prototype, "subtotalEur", void 0);
 __decorate([

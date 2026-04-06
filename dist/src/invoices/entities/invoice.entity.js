@@ -26,9 +26,9 @@ var DeliveryChannel;
 })(DeliveryChannel || (exports.DeliveryChannel = DeliveryChannel = {}));
 var DeliveryStatus;
 (function (DeliveryStatus) {
-    DeliveryStatus["PENDING"] = "pending";
     DeliveryStatus["SENT"] = "sent";
     DeliveryStatus["FAILED"] = "failed";
+    DeliveryStatus["RESENT"] = "resent";
 })(DeliveryStatus || (exports.DeliveryStatus = DeliveryStatus = {}));
 let Invoice = class Invoice {
     get isOverdue() {
@@ -55,9 +55,9 @@ __decorate([
     __metadata("design:type", Number)
 ], Invoice.prototype, "orderId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'issued_by' }),
-    __metadata("design:type", Number)
-], Invoice.prototype, "issuedBy", void 0);
+    (0, typeorm_1.CreateDateColumn)({ name: 'issued_at', type: 'timestamptz' }),
+    __metadata("design:type", Date)
+], Invoice.prototype, "issuedAt", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'due_date', type: 'date' }),
     __metadata("design:type", String)
@@ -86,10 +86,6 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'pdf_url', nullable: true }),
     __metadata("design:type", String)
 ], Invoice.prototype, "pdfUrl", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'pdf_s3_key', nullable: true }),
-    __metadata("design:type", String)
-], Invoice.prototype, "pdfS3Key", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'paid_at', type: 'timestamptz', nullable: true }),
     __metadata("design:type", Date)
@@ -126,7 +122,7 @@ __decorate([
     __metadata("design:type", String)
 ], InvoiceDelivery.prototype, "channel", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.PENDING }),
+    (0, typeorm_1.Column)({ type: 'enum', enum: DeliveryStatus, default: DeliveryStatus.SENT }),
     __metadata("design:type", String)
 ], InvoiceDelivery.prototype, "status", void 0);
 __decorate([
@@ -134,21 +130,13 @@ __decorate([
     __metadata("design:type", String)
 ], InvoiceDelivery.prototype, "recipient", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'error_message', type: 'text', nullable: true }),
+    (0, typeorm_1.Column)({ name: 'error', type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], InvoiceDelivery.prototype, "errorMessage", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'sent_at', type: 'timestamptz', nullable: true }),
     __metadata("design:type", Date)
 ], InvoiceDelivery.prototype, "sentAt", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'attempts', default: 0 }),
-    __metadata("design:type", Number)
-], InvoiceDelivery.prototype, "attempts", void 0);
-__decorate([
-    (0, typeorm_1.Column)({ name: 'external_id', nullable: true }),
-    __metadata("design:type", String)
-], InvoiceDelivery.prototype, "externalId", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)({ name: 'created_at', type: 'timestamptz' }),
     __metadata("design:type", Date)

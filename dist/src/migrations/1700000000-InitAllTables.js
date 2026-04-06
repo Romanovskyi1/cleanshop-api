@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.InitAllTables1700000000 = void 0;
-class InitAllTables1700000000 {
+exports.InitAllTables1700000000000 = void 0;
+class InitAllTables1700000000000 {
     constructor() {
-        this.name = 'InitAllTables1700000000';
+        this.name = 'InitAllTables1700000000000';
     }
     async up(queryRunner) {
         await queryRunner.query(`
@@ -508,5 +508,5 @@ class InitAllTables1700000000 {
         await queryRunner.query(`DROP FUNCTION IF EXISTS update_updated_at_column()`);
     }
 }
-exports.InitAllTables1700000000 = InitAllTables1700000000;
+exports.InitAllTables1700000000000 = InitAllTables1700000000000;
 //# sourceMappingURL=1700000000-InitAllTables.js.map

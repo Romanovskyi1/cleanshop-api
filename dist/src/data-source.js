@@ -14,7 +14,7 @@ exports.AppDataSource = new typeorm_1.DataSource({
         ? { rejectUnauthorized: false }
         : false,
     entities: ['src/**/*.entity.ts'],
-    migrations: ['src/db/migrations/*.ts'],
+    migrations: ['src/migrations/*.ts'],
     synchronize: false,
     logging: process.env.NODE_ENV !== 'production',
 });

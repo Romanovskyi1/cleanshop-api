@@ -13,13 +13,15 @@ const pallets_service_1 = require("./pallets.service");
 const pallets_controller_1 = require("./pallets.controller");
 const pallet_entity_1 = require("./entities/pallet.entity");
 const truck_entity_1 = require("../orders/entities/truck.entity");
+const order_entity_1 = require("../orders/entities/order.entity");
+const product_entity_1 = require("../products/entities/product.entity");
 let PalletsModule = class PalletsModule {
 };
 exports.PalletsModule = PalletsModule;
 exports.PalletsModule = PalletsModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([pallet_entity_1.Pallet, pallet_entity_1.PalletItem, truck_entity_1.Truck]),
+            typeorm_1.TypeOrmModule.forFeature([pallet_entity_1.Pallet, pallet_entity_1.PalletItem, truck_entity_1.Truck, order_entity_1.Order, product_entity_1.Product]),
         ],
         controllers: [pallets_controller_1.PalletsController],
         providers: [pallets_service_1.PalletsService],

@@ -53,26 +53,11 @@ export class Truck {
   })
   maxWeightKg: number;
 
-  /**
-   * Гос. номер фуры — необязательный, заполняет менеджер.
-   * Отображается в планировщике и инвойсе.
-   */
-  @Column({ name: 'license_plate', nullable: true, length: 20 })
-  licensePlate: string | null;
-
-  /**
-   * Имя водителя / экспедитора — необязательный.
-   */
-  @Column({ name: 'driver_name', nullable: true, length: 255 })
-  driverName: string | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   // ── Computed ──────────────────────────────────────────────────────────
   get displayName(): string {
-    return this.licensePlate
-      ? `Фура ${this.number} (${this.licensePlate})`
-      : `Фура ${this.number}`;
+    return `Фура ${this.number}`;
   }
 }

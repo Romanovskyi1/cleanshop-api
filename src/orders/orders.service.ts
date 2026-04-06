@@ -49,8 +49,8 @@ export class OrdersService {
   ): Promise<Order> {
     let order = this.orders.create({
       companyId,
-      truckCount:   dto.truckCount ?? 1,
-      notes:        dto.notes ?? null,
+      notes:        dto.notes     ?? null,
+      truckType:    dto.truckType ?? null,
       status:       OrderStatus.DRAFT,
     });
 
@@ -118,6 +118,69 @@ export class OrdersService {
   }
 
   /**
+   * Удалить черновик заказа (только статус draft).
+   */
+  async removeDraft(id: number, companyId: number): Promise<void> {
+    const order = await this.findOne(id, companyId);
+    if (order.status !== OrderStatus.DRAFT) {
+      throw new ForbiddenException('Можно удалить только черновик заказа');
+    }
+    await this.orders.remove(order);
+    this.logger.log(`Order #${id} (draft) deleted by company ${companyId}`);
+  }
+
+  /**
+   * [Клиент] Отправить черновик менеджеру (без обязательной даты).
+   * draft → negotiating
+   */
+  async submitDraft(id: number, companyId: number, actorId: number): Promise<Order> {
+    const order = await this.findOne(id, companyId);
+    if (order.status !== OrderStatus.DRAFT) {
+      throw new BadRequestException('Можно отправить только черновик');
+    }
+    order.status    = OrderStatus.NEGOTIATING;
+    order.proposedBy = actorId;
+    await this.orders.save(order);
+    await this.writeHistory(
+      order.id, OrderStatus.DRAFT, OrderStatus.NEGOTIATING,
+      actorId, 'client', 'Клиент отправил заказ менеджеру',
+    );
+    this.logger.log(`Order #${id}: submitted (draft→negotiating) by client ${actorId}`);
+    return order;
+  }
+
+  /**
+   * [Клиент] Отменить заказ в статусе negotiating.
+   * negotiating → cancelled
+   */
+  async clientCancelOrder(id: number, companyId: number, actorId: number): Promise<Order> {
+    const order = await this.findOne(id, companyId);
+    if (order.status !== OrderStatus.NEGOTIATING) {
+      throw new BadRequestException(
+        'Клиент может отменить только заказ в статусе согласования',
+      );
+    }
+    order.status = OrderStatus.CANCELLED;
+    await this.orders.save(order);
+    await this.writeHistory(
+      order.id, OrderStatus.NEGOTIATING, OrderStatus.CANCELLED,
+      actorId, 'client', 'Отменён клиентом',
+    );
+    this.logger.log(`Order #${id}: cancelled by client ${actorId}`);
+    return order;
+  }
+
+  /**
+   * Принудительно удалить заказ (admin only, любой статус).
+   */
+  async forceDelete(id: number): Promise<void> {
+    const order = await this.orders.findOne({ where: { id } });
+    if (!order) throw new NotFoundException(`Заказ #${id} не найден`);
+    await this.orders.remove(order);
+    this.logger.log(`Order #${id} force-deleted by admin`);
+  }
+
+  /**
    * Обновить заметки / количество фур (до locked).
    */
   async update(id: number, companyId: number, dto: UpdateOrderDto): Promise<Order> {
@@ -125,7 +188,7 @@ export class OrdersService {
     if (!order.isEditable) {
       throw new ForbiddenException('Заказ нельзя редактировать в текущем статусе');
     }
-    if (dto.truckCount !== undefined) order.truckCount = dto.truckCount;
+    // truckCount removed
     if (dto.notes      !== undefined) order.notes      = dto.notes;
     return this.orders.save(order);
   }
@@ -194,12 +257,11 @@ export class OrdersService {
     this.assertTransition(order, OrderStatus.CONFIRMED);
     this.validateFutureDate(dto.confirmedDate);
 
-    order.confirmedDate = dto.confirmedDate;
-    order.confirmedBy   = actorId;
-    order.status        = OrderStatus.CONFIRMED;
-    if (dto.truckCount) order.truckCount = dto.truckCount;
+    order.confirmedDate  = dto.confirmedDate;
+    order.confirmedBy    = actorId;
+    order.status         = OrderStatus.CONFIRMED;
 
-    // Вычисляем окно редактирования паллет
+    // Вычисляем и сохраняем окно редактирования паллет
     const { opens, closes } = this.calcPalletWindow(dto.confirmedDate);
     order.windowOpensAt  = opens;
     order.windowClosesAt = closes;
@@ -219,22 +281,31 @@ export class OrdersService {
   }
 
   /**
-   * [Cron] Открыть окно паллет — confirmed → building.
-   * Вызывается автоматически за WINDOW_DAYS_BEFORE дней до погрузки.
+   * Открыть окно паллет — confirmed → building.
+   * Вызывается автоматически (cron) или вручную менеджером.
+   * @param actorId — null для cron, ID менеджера для ручного открытия
    */
-  async openPalletWindow(id: number): Promise<Order> {
+  async openPalletWindow(id: number, actorId: number | null = null): Promise<Order> {
     const order = await this.findOne(id);
     this.assertTransition(order, OrderStatus.BUILDING);
 
     order.status = OrderStatus.BUILDING;
+
+    // Если окно не было рассчитано ранее — рассчитываем сейчас
+    if (!order.windowClosesAt && order.confirmedDate) {
+      const { opens, closes } = this.calcPalletWindow(order.confirmedDate);
+      order.windowOpensAt  = opens;
+      order.windowClosesAt = closes;
+    }
+
     await this.orders.save(order);
     await this.writeHistory(
       order.id, OrderStatus.CONFIRMED, OrderStatus.BUILDING,
-      null, 'system',
-      'Окно паллет открыто автоматически',
+      actorId, actorId ? 'manager' : 'system',
+      actorId ? 'Окно паллет открыто менеджером вручную' : 'Окно паллет открыто автоматически',
     );
 
-    this.logger.log(`Order #${id}: pallet window OPENED (building)`);
+    this.logger.log(`Order #${id}: pallet window OPENED (building) by ${actorId ?? 'system'}`);
     return order;
   }
 
@@ -258,7 +329,7 @@ export class OrdersService {
     }
 
     order.status   = OrderStatus.LOCKED;
-    order.lockedBy = actorId;
+    // lockedBy removed
 
     await this.orders.save(order);
     await this.writeHistory(
@@ -301,7 +372,7 @@ export class OrdersService {
     this.assertTransition(order, OrderStatus.SHIPPED);
 
     order.status    = OrderStatus.SHIPPED;
-    order.shippedBy = actorId;
+    // shippedBy removed
     order.shippedAt = new Date();
 
     await this.orders.save(order);
@@ -371,7 +442,7 @@ export class OrdersService {
     return this.orders
       .createQueryBuilder('o')
       .where('o.status = :status', { status: OrderStatus.BUILDING })
-      .andWhere('o.window_closes_at < :now', { now: new Date() })
+      .andWhere('o.pallet_deadline < :now', { now: new Date() })
       .getMany();
   }
 
@@ -389,7 +460,7 @@ export class OrdersService {
     return this.orders
       .createQueryBuilder('o')
       .where('o.status = :status', { status: OrderStatus.BUILDING })
-      .andWhere('o.window_closes_at BETWEEN :start AND :end', {
+      .andWhere('o.pallet_deadline BETWEEN :start AND :end', {
         start: dayStart,
         end:   target,
       })

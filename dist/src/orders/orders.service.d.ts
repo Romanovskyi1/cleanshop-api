@@ -14,11 +14,15 @@ export declare class OrdersService {
         total: number;
     }>;
     findOne(id: number, companyId?: number): Promise<Order>;
+    removeDraft(id: number, companyId: number): Promise<void>;
+    submitDraft(id: number, companyId: number, actorId: number): Promise<Order>;
+    clientCancelOrder(id: number, companyId: number, actorId: number): Promise<Order>;
+    forceDelete(id: number): Promise<void>;
     update(id: number, companyId: number, dto: UpdateOrderDto): Promise<Order>;
     getHistory(orderId: number): Promise<OrderStatusHistory[]>;
     proposeDate(id: number, companyId: number, actorId: number, dto: ProposeDateDto): Promise<Order>;
     confirmDate(id: number, actorId: number, dto: ConfirmDateDto): Promise<Order>;
-    openPalletWindow(id: number): Promise<Order>;
+    openPalletWindow(id: number, actorId?: number | null): Promise<Order>;
     confirmPlan(id: number, companyId: number, actorId: number, dto: ConfirmPlanDto): Promise<Order>;
     autoLock(id: number): Promise<Order>;
     ship(id: number, actorId: number, dto: ShipOrderDto): Promise<Order>;

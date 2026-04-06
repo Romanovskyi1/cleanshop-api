@@ -14,8 +14,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * shipped     — фуры отгружены
  * cancelled   — заказ отменён
  */
-export class CreateOrdersAndTrucks1700000004 implements MigrationInterface {
-  name = 'CreateOrdersAndTrucks1700000004';
+export class CreateOrdersAndTrucks1700000004000 implements MigrationInterface {
+  name = 'CreateOrdersAndTrucks1700000004000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
 
@@ -52,12 +52,8 @@ export class CreateOrdersAndTrucks1700000004 implements MigrationInterface {
         -- Статус
         "status"              "order_status_enum" NOT NULL DEFAULT 'draft',
 
-        -- Дедлайн для сборки паллет (confirmed_date - 1 день в 23:59)
-        "pallet_deadline"     TIMESTAMPTZ
-          GENERATED ALWAYS AS (
-            ("confirmed_date" - INTERVAL '1 day')::TIMESTAMPTZ
-            + INTERVAL '23 hours 59 minutes'
-          ) STORED,
+        -- Дедлайн для сборки паллет (вычисляется на уровне сервиса)
+        "pallet_deadline"     TIMESTAMPTZ,
 
         -- Итоги (обновляются триггером при изменении паллет)
         "total_pallets"       INTEGER             NOT NULL DEFAULT 0,

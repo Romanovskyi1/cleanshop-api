@@ -171,8 +171,7 @@ export class InvoiceDistributionService {
       this.deliveries.create({
         invoiceId: invoice.id,
         channel,
-        status:    DeliveryStatus.PENDING,
-        attempts:  1,
+        status:    DeliveryStatus.SENT,
       }),
     );
 
@@ -245,7 +244,7 @@ export class InvoiceDistributionService {
       // Успех — обновляем запись
       await this.deliveries.update(delivery.id, {
         status:     DeliveryStatus.SENT,
-        externalId: String(result.messageId ?? ''),
+        // externalId removed
         sentAt:     new Date(),
       });
 

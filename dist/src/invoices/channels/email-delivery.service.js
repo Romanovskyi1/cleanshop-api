@@ -13,13 +13,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmailDeliveryService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const mail_1 = require("@sendgrid/mail");
+const sgMail = require("@sendgrid/mail");
 let EmailDeliveryService = EmailDeliveryService_1 = class EmailDeliveryService {
     constructor(config) {
         this.config = config;
         this.logger = new common_1.Logger(EmailDeliveryService_1.name);
-        mail_1.default.setApiKey(config.getOrThrow('SENDGRID_API_KEY'));
-        this.from = config.getOrThrow('SENDGRID_FROM');
+        const key = config.get('SENDGRID_API_KEY');
+        if (key && key !== 'placeholder') {
+            sgMail.setApiKey(key);
+        }
+        this.from = config.get('SENDGRID_FROM', 'noreply@cleanshop.com');
         this.fromName = config.get('SENDGRID_FROM_NAME', 'CleanShop B2B');
     }
     async sendInvoice(to, pdfBuffer, invoiceNumber, params) {
@@ -28,7 +31,7 @@ let EmailDeliveryService = EmailDeliveryService_1 = class EmailDeliveryService {
             day: '2-digit', month: 'long', year: 'numeric',
         });
         try {
-            const [response] = await mail_1.default.send({
+            const [response] = await sgMail.send({
                 to,
                 from: { email: this.from, name: this.fromName },
                 subject: `Инвойс ${invoiceNumber} — € ${Number(params.totalEur).toLocaleString('de-DE', { minimumFractionDigits: 2 })}`,

@@ -14,6 +14,10 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProductsController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const path = require("path");
+const fs = require("fs");
 const products_service_1 = require("./products.service");
 const product_dto_1 = require("./dto/product.dto");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
@@ -50,6 +54,10 @@ let ProductsController = class ProductsController {
     }
     remove(id) {
         return this.service.adminRemove(id);
+    }
+    uploadImages(id, files) {
+        const urls = files.map(f => "/uploads/products/" + f.filename);
+        return this.service.addImages(id, urls);
     }
 };
 exports.ProductsController = ProductsController;
@@ -120,6 +128,33 @@ __decorate([
     __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", void 0)
 ], ProductsController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Post)(":id/images"),
+    (0, roles_decorator_1.Roles)(user_entity_1.UserRole.ADMIN),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FilesInterceptor)("files", 5, {
+        storage: (0, multer_1.diskStorage)({
+            destination: (req, file, cb) => {
+                const dir = "./uploads/products";
+                fs.mkdirSync(dir, { recursive: true });
+                cb(null, dir);
+            },
+            filename: (req, file, cb) => {
+                const ext = path.extname(file.originalname);
+                const name = Date.now() + "-" + Math.round(Math.random() * 1e6) + ext;
+                cb(null, name);
+            },
+        }),
+        fileFilter: (req, file, cb) => {
+            const ok = /image\/(jpeg|png|webp)/.test(file.mimetype);
+            cb(ok ? null : new common_1.BadRequestException("Только jpeg/png/webp"), ok);
+        },
+    })),
+    __param(0, (0, common_1.Param)("id", common_1.ParseIntPipe)),
+    __param(1, (0, common_1.UploadedFiles)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Number, Array]),
+    __metadata("design:returntype", void 0)
+], ProductsController.prototype, "uploadImages", null);
 exports.ProductsController = ProductsController = __decorate([
     (0, common_1.Controller)('catalog'),
     __metadata("design:paramtypes", [products_service_1.ProductsService])

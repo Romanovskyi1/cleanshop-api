@@ -50,4 +50,32 @@ export class UsersService {
 
     return this.repo.save(user).catch(() => this.repo.findOneOrFail({ where: { telegramId: String(tgUser.id) } }));
   }
+
+  /**
+   * Найти или создать стаб-пользователя по Telegram ID.
+   * Используется при регистрации клиента менеджером.
+   */
+  async findOrCreateByTelegramId(telegramId: string, firstName?: string): Promise<User> {
+    let user = await this.findByTelegramId(telegramId);
+    if (!user) {
+      user = this.repo.create({
+        telegramId,
+        firstName: firstName ?? 'Client',
+        lastName:  '',
+        languageCode: 'ru',
+      });
+      user = await this.repo.save(user);
+    }
+    return user;
+  }
+
+  /**
+   * Привязать пользователя к компании.
+   */
+  async linkToCompany(userId: number, companyId: number): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) throw new Error(`User #${userId} not found`);
+    user.companyId = companyId;
+    return this.repo.save(user);
+  }
 }

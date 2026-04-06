@@ -21,8 +21,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Запуск:   npm run migration:run
  * Откат:    npm run migration:revert
  */
-export class InitAllTables1700000000 implements MigrationInterface {
-  name = 'InitAllTables1700000000';
+export class InitAllTables1700000000000 implements MigrationInterface {
+  name = 'InitAllTables1700000000000';
 
   // ════════════════════════════════════════════════════════════════════
   // UP
