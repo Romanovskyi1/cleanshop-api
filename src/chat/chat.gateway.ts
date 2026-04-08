@@ -41,7 +41,10 @@ import { UsersService }    from '../users/users.service';
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
-    origin:      '*', // в продакшне: ['https://web.telegram.org', ...]
+    origin: [
+      'https://web.telegram.org',
+      'https://cleanshop-tma-production.up.railway.app',
+    ],
     credentials: true,
   },
 })
