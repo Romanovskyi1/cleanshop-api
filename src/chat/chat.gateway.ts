@@ -85,10 +85,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Аттачим данные к сокету
-      socket.data.userId    = user.id;
-      socket.data.companyId = user.companyId;
-      socket.data.isManager = user.isManager;
-      socket.data.name      = user.displayName;
+      socket.data.userId       = user.id;
+      socket.data.companyId    = user.companyId;
+      socket.data.isManager    = user.isManager;
+      socket.data.name         = user.displayName;
+      socket.data.languageCode = user.languageCode ?? 'en';
 
       // Менеджеры подключаются к общей комнате, клиенты — к комнате компании
       if (user.isManager) {
@@ -137,12 +138,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: Socket,
     @MessageBody() payload: WsSendPayload,
   ): Promise<void> {
-    const { userId, companyId, name } = socket.data;
+    const { userId, companyId, name, languageCode } = socket.data;
 
     if (!companyId || !userId) return;
 
     // Текущий контекст клиента — в продакшне загружать из OrdersService
-    const ctx = await this.buildClientContext(companyId, name);
+    const ctx = await this.buildClientContext(companyId, name, languageCode);
 
     // Показываем typing от имени ИИ/менеджера
     const status = this.aiService.getChatStatus();
@@ -271,6 +272,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private async buildClientContext(
     companyId: number,
     contactName: string,
+    languageCode = 'en',
   ): Promise<import('./prompts/system-prompt').ClientContext> {
     // Загружаем активные заказы компании
     const { items: orders } = await this.ordersService.findAll(
@@ -294,7 +296,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return {
       companyName:     `Company #${companyId}`,
       contactName,
-      languageCode:    'en',
+      languageCode,
       activeOrders,
       pendingPallets:  0,
       pendingInvoices: 0,
