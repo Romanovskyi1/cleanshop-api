@@ -60,7 +60,7 @@ export class ChatMessage {
    * Структурированный payload для CardMessage.
    * Пример: { type: 'price_card', productId: 1, ... }
    */
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ name: 'card_payload', type: 'jsonb', nullable: true })
   cardPayload: Record<string, unknown> | null;
 
   @Column({ name: 'is_read', default: false })
