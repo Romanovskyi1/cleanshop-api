@@ -3,7 +3,7 @@ import {
   SubscribeMessage, MessageBody, ConnectedSocket,
   OnGatewayConnection, OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { UseGuards, Logger } from '@nestjs/common';
+import { UseGuards, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { Server, Socket }   from 'socket.io';
 
 import { ChatService }   from './chat.service';
@@ -137,6 +137,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
    * Клиент отправляет сообщение.
    */
   @SubscribeMessage('message:send')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   async onMessageSend(
     @ConnectedSocket() socket: Socket,
     @MessageBody() payload: WsSendPayload,

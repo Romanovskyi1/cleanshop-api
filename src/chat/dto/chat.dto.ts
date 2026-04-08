@@ -62,8 +62,14 @@ export interface WsReadEvent {
 
 // ── WebSocket events (client → server) ──────────────────────────────────────
 
-export interface WsSendPayload {
-  text:           string;
+export class WsSendPayload {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(4000)
+  text: string;
+
+  @IsOptional()
+  @IsUrl()
   attachmentUrl?: string;
 }
 
