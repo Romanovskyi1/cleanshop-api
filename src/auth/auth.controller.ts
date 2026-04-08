@@ -7,6 +7,7 @@ import {
   Get,
   Patch,
   Logger,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { TelegramAuthDto, RefreshTokenDto, CredentialsLoginDto } from './dto/auth.dto';
@@ -93,6 +94,9 @@ export class AuthController {
   @Post('dev-login')
   @HttpCode(HttpStatus.OK)
   async devLogin(@Body() body: { telegramId: string }) {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new ForbiddenException('Not available in production');
+    }
     const result = await this.authService.devLogin(body.telegramId);
     return {
       accessToken:  result.accessToken,
