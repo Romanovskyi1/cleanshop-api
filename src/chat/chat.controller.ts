@@ -25,8 +25,13 @@ export class ChatController {
     @CurrentUser() user: User,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 50,
     @Query('before') before?: string,
+    @Query('companyId', new ParseIntPipe({ optional: true })) companyId?: number,
   ) {
-    return this.chatService.getHistory(user.companyId, limit, before);
+    const resolvedCompanyId =
+      user.role === UserRole.MANAGER || user.role === UserRole.ADMIN
+        ? companyId
+        : user.companyId;
+    return this.chatService.getHistory(resolvedCompanyId, limit, before);
   }
 
   /**

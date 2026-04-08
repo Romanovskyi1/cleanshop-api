@@ -9,6 +9,7 @@ import { ChatGateway }     from './chat.gateway';
 import { ChatController }  from './chat.controller';
 import { AiService }       from './ai.service';
 import { UsersModule }     from '../users/users.module';
+import { OrdersModule }    from '../orders/orders.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UsersModule }     from '../users/users.module';
     TypeOrmModule.forFeature([ChatMessage]),
     JwtModule.register({}), // секрет через ConfigService в AiService/Gateway
     UsersModule,
+    OrdersModule,
   ],
   controllers: [ChatController],
   providers:   [ChatService, ChatGateway, AiService],

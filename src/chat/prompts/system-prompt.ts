@@ -7,6 +7,8 @@
  * Модель: claude-sonnet-4-20250514
  */
 
+import { PRODUCT_KNOWLEDGE } from './knowledge';
+
 export interface ClientContext {
   companyName:     string;
   contactName:     string;
@@ -58,6 +60,9 @@ Active orders:
 ${ordersContext}
 Unassigned pallets: ${ctx.pendingPallets}
 Invoices awaiting payment: ${ctx.pendingInvoices}
+
+## Knowledge Base
+${PRODUCT_KNOWLEDGE}
 
 ## Behaviour rules
 

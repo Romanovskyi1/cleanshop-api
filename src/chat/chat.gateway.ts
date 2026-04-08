@@ -10,6 +10,8 @@ import { ChatService }   from './chat.service';
 import { AiService }     from './ai.service';
 import { SenderType }    from './entities/chat-message.entity';
 import { WsSendPayload, WsTypingPayload } from './dto/chat.dto';
+import { OrdersService } from '../orders/orders.service';
+import { OrderStatus }   from '../orders/entities/order.entity';
 
 // Упрощённый guard для WS — в продакшне использовать WsJwtGuard
 // (извлекает JWT из handshake.auth.token)
@@ -53,11 +55,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly rooms = new Map<number, Set<string>>();
 
   constructor(
-    private readonly chatService: ChatService,
-    private readonly aiService:   AiService,
-    private readonly jwt:         JwtService,
-    private readonly config:      ConfigService,
-    private readonly users:       UsersService,
+    private readonly chatService:   ChatService,
+    private readonly aiService:     AiService,
+    private readonly jwt:           JwtService,
+    private readonly config:        ConfigService,
+    private readonly users:         UsersService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════
@@ -72,7 +75,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       const user = await this.users.findById(payload.sub);
-      if (!user || !user.isActive || !user.companyId) {
+      if (!user || !user.isActive) {
+        socket.disconnect();
+        return;
+      }
+      if (!user.isManager && !user.companyId) {
         socket.disconnect();
         return;
       }
@@ -83,14 +90,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       socket.data.isManager = user.isManager;
       socket.data.name      = user.displayName;
 
-      // Присоединяем к комнате компании
-      const room = `company:${user.companyId}`;
-      await socket.join(room);
-
-      if (!this.rooms.has(user.companyId)) {
-        this.rooms.set(user.companyId, new Set());
+      // Менеджеры подключаются к общей комнате, клиенты — к комнате компании
+      if (user.isManager) {
+        await socket.join('managers');
       }
-      this.rooms.get(user.companyId)!.add(socket.id);
+      if (user.companyId) {
+        await socket.join(`company:${user.companyId}`);
+      }
+
+      if (user.companyId) {
+        if (!this.rooms.has(user.companyId)) {
+          this.rooms.set(user.companyId, new Set());
+        }
+        this.rooms.get(user.companyId)!.add(socket.id);
+      }
 
       // Отправляем текущий статус чата
       socket.emit('chat:status', this.aiService.getChatStatus());
@@ -248,22 +261,41 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private broadcastToCompany(companyId: number, event: string, data: unknown): void {
     this.server.to(`company:${companyId}`).emit(event, data);
+    // Менеджеры получают все сообщения всех компаний
+    this.server.to('managers').emit(event, { ...(data as object), companyId });
   }
 
   /**
    * Построить контекст клиента для system prompt.
-   * В продакшне: загружать из OrdersService, InvoicesService.
    */
   private async buildClientContext(
     companyId: number,
     contactName: string,
   ): Promise<import('./prompts/system-prompt').ClientContext> {
-    // TODO: заменить на реальные данные из OrdersService / InvoicesService
+    // Загружаем активные заказы компании
+    const { items: orders } = await this.ordersService.findAll(
+      { status: undefined, page: 1, limit: 10 },
+      companyId,
+    );
+    const activeStatuses = new Set<string>([
+      OrderStatus.DRAFT,
+      OrderStatus.CONFIRMED,
+      OrderStatus.BUILDING,
+    ]);
+    const activeOrders = orders
+      .filter(o => activeStatuses.has(o.status))
+      .slice(0, 5)
+      .map(o => ({
+        id:            o.id,
+        status:        o.status,
+        confirmedDate: o.confirmedDate ?? undefined,
+      }));
+
     return {
       companyName:     `Company #${companyId}`,
       contactName,
       languageCode:    'en',
-      activeOrders:    [],
+      activeOrders,
       pendingPallets:  0,
       pendingInvoices: 0,
       recentProducts:  [],
