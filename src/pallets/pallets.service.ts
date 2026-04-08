@@ -605,7 +605,7 @@ export class PalletsService {
       return;
     }
 
-    const truck = await this.trucks.findOne({ where: { id: truckId } });
+    const truck = await this.trucks.findOne({ where: { id: truckId, orderId: pallet.orderId } });
     if (!truck) throw new NotFoundException(`Фура #${truckId} не найдена`);
 
     const currentCount = await this.pallets.count({ where: { truckId } });
