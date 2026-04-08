@@ -10,33 +10,23 @@ import { Company, InvoiceTerms }  from './entities/company.entity';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function makeCompany(overrides: Partial<Company> = {}): Company {
-  return Object.assign(new Company(), {
-    id:                   1,
-    name:                 'CleanService sp. z o.o.',
-    vatNumber:            'PL9876543210',
-    address:              'ul. Marszałkowska 84, Warszawa',
-    countryCode:          'PL',
-    invoiceEmail:         'invoices@cleanservice.pl',
-    telegramGroupChatId:  '-1001234567890',
-    primaryContactName:   'Klaus Weber',
-    invoiceTerms:         InvoiceTerms.NET_30,
-    vatRate:              23.00,
-    iban:                 null,
-    notes:                null,
-    isActive:             true,
-    createdAt:            new Date('2025-01-01'),
-    updatedAt:            new Date('2025-01-01'),
-    get paymentDays() { return parseInt(this.invoiceTerms.replace('NET',''),10); },
-    calcDueDate(issued: Date) {
-      const d = new Date(issued);
-      d.setDate(d.getDate() + this.paymentDays);
-      return d;
-    },
-    calcDueDateStr(issued: Date) {
-      return this.calcDueDate(issued).toISOString().slice(0,10);
-    },
-    ...overrides,
-  });
+  const company = new Company();
+  company.id                  = 1;
+  company.name                = 'CleanService sp. z o.o.';
+  company.vatNumber           = 'PL9876543210';
+  company.address             = 'ul. Marszałkowska 84, Warszawa';
+  company.countryCode         = 'PL';
+  company.invoiceEmail        = 'invoices@cleanservice.pl';
+  company.telegramGroupChatId = '-1001234567890';
+  company.primaryContactName  = 'Klaus Weber';
+  company.invoiceTerms        = InvoiceTerms.NET_30;
+  company.vatRate             = 23.00;
+  company.iban                = null;
+  company.notes               = null;
+  company.isActive            = true;
+  company.createdAt           = new Date('2025-01-01');
+  company.updatedAt           = new Date('2025-01-01');
+  return Object.assign(company, overrides);
 }
 
 const mockContact = {
@@ -147,7 +137,7 @@ describe('CompaniesService', () => {
       const result = await service.resolveDeliveryContacts(
         1,
         mockContact,
-        new Date('2025-03-10'),
+        new Date('2025-03-10T12:00:00Z'),
       );
 
       expect(result.companyName).toBe('CleanService sp. z o.o.');
@@ -191,7 +181,7 @@ describe('CompaniesService', () => {
   describe('Company.calcDueDateStr', () => {
     it('NET30: +30 дней', () => {
       const c = makeCompany({ invoiceTerms: InvoiceTerms.NET_30 });
-      expect(c.calcDueDateStr(new Date('2025-03-10'))).toBe('2025-04-09');
+      expect(c.calcDueDateStr(new Date('2025-03-10T12:00:00Z'))).toBe('2025-04-09');
     });
 
     it('NET15: +15 дней', () => {

@@ -72,8 +72,9 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     const usersServiceMock: Partial<jest.Mocked<UsersService>> = {
-      upsert:     jest.fn().mockResolvedValue(mockUser),
-      findById:   jest.fn().mockResolvedValue(mockUser),
+      upsert:            jest.fn().mockResolvedValue(mockUser),
+      findById:          jest.fn().mockResolvedValue(mockUser),
+      findByTelegramId:  jest.fn().mockResolvedValue(mockUser),
     };
 
     const jwtServiceMock: Partial<jest.Mocked<JwtService>> = {
@@ -90,14 +91,14 @@ describe('AuthService', () => {
         };
         if (!map[key]) throw new Error(`Config key not found: ${key}`);
         return map[key];
-      }),
+      }) as any,
       get: jest.fn((key: string, fallback?: string) => {
         const map: Record<string, string> = {
           JWT_ACCESS_EXPIRES:  '15m',
           JWT_REFRESH_EXPIRES: '30d',
         };
         return map[key] ?? fallback;
-      }),
+      }) as any,
     };
 
     const module: TestingModule = await Test.createTestingModule({

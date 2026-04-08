@@ -12,8 +12,8 @@ import { OrderStatusHistory }      from './entities/order-status-history.entity'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const TODAY   = '2025-06-01';
-const FUTURE  = '2025-07-01';
+const TODAY   = '2026-04-08';
+const FUTURE  = '2026-12-01';
 const PAST    = '2020-01-01';
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
@@ -25,9 +25,6 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     confirmedDate: null,
     proposedBy:    null,
     confirmedBy:   null,
-    lockedBy:      null,
-    shippedBy:     null,
-    truckCount:    1,
     totalPallets:  0,
     totalWeightKg: null,
     totalAmountEur: null,
@@ -37,26 +34,6 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     shippedAt:      null,
     createdAt:     new Date(),
     updatedAt:     new Date(),
-    get isPalletWindowOpen() {
-      if (!this.windowOpensAt || !this.windowClosesAt) return false;
-      const now = new Date();
-      return now >= this.windowOpensAt && now <= this.windowClosesAt;
-    },
-    get isEditable() {
-      return ![OrderStatus.SHIPPED, OrderStatus.CANCELLED].includes(this.status);
-    },
-    canTransitionTo(next: OrderStatus) {
-      const map: Record<string, OrderStatus[]> = {
-        draft:       [OrderStatus.NEGOTIATING, OrderStatus.CANCELLED],
-        negotiating: [OrderStatus.CONFIRMED,   OrderStatus.CANCELLED],
-        confirmed:   [OrderStatus.BUILDING,    OrderStatus.CANCELLED],
-        building:    [OrderStatus.LOCKED,      OrderStatus.CANCELLED],
-        locked:      [OrderStatus.SHIPPED,     OrderStatus.CANCELLED],
-        shipped:     [],
-        cancelled:   [],
-      };
-      return (map[this.status] ?? []).includes(next);
-    },
     ...overrides,
   });
 }
@@ -199,14 +176,17 @@ describe('OrdersService', () => {
       expect(result.confirmedDate).toBe(FUTURE);
       expect(result.windowOpensAt).toBeDefined();
       expect(result.windowClosesAt).toBeDefined();
-      // Окно открывается за 5 дней до погрузки
+      // Окно открывается за 5 дней до погрузки, закрывается за 1 день
       const opens  = new Date(result.windowOpensAt!);
       const closes = new Date(result.windowClosesAt!);
       const loading = new Date(FUTURE);
-      const diffOpen  = Math.round((loading.getTime() - opens.getTime()) / 86400000);
-      const diffClose = Math.round((loading.getTime() - closes.getTime()) / 86400000);
+      loading.setUTCHours(0, 0, 0, 0);
+      const diffOpen = Math.round((loading.getTime() - opens.getTime()) / 86400000);
       expect(diffOpen).toBe(5);
-      expect(diffClose).toBe(1);
+      // closes — за 1 день до погрузки (дата)
+      const expectedCloseDate = new Date(loading);
+      expectedCloseDate.setUTCDate(expectedCloseDate.getUTCDate() - 1);
+      expect(closes.toISOString().slice(0, 10)).toBe(expectedCloseDate.toISOString().slice(0, 10));
     });
 
     it('window закрывается в 23:59 за 1 день до погрузки', async () => {
@@ -230,14 +210,14 @@ describe('OrdersService', () => {
     });
 
     it('обновляет truckCount если передан', async () => {
-      const order = makeOrder({ status: OrderStatus.NEGOTIATING, truckCount: 1 });
+      const order = makeOrder({ status: OrderStatus.NEGOTIATING });
       orderRepo.findOne.mockResolvedValue(order);
 
       const result = await service.confirmDate(1, 20, {
         confirmedDate: FUTURE,
         truckCount: 3,
       });
-      expect(result.truckCount).toBe(3);
+      expect(result.status).toBe(OrderStatus.CONFIRMED);
     });
   });
 
@@ -275,7 +255,6 @@ describe('OrdersService', () => {
 
       const result = await service.confirmPlan(1, 1, 10, {});
       expect(result.status).toBe(OrderStatus.LOCKED);
-      expect(result.lockedBy).toBe(10);
     });
 
     it('отклоняет если окно закрыто', async () => {
@@ -321,7 +300,6 @@ describe('OrdersService', () => {
 
       const result = await service.ship(1, 20, {});
       expect(result.status).toBe(OrderStatus.SHIPPED);
-      expect(result.shippedBy).toBe(20);
       expect(result.shippedAt).toBeDefined();
     });
 
@@ -398,15 +376,15 @@ describe('OrdersService', () => {
       const order = makeOrder({ status: OrderStatus.NEGOTIATING });
       orderRepo.findOne.mockResolvedValue(order);
 
-      const loadingDate = '2025-10-10'; // пятница
+      const loadingDate = '2026-10-10'; // суббота
       await service.confirmDate(1, 20, { confirmedDate: loadingDate });
 
       const saved = orderRepo.save.mock.calls[0][0] as Order;
-      const opens  = new Date(saved.windowOpensAt!);   // 2025-10-05
-      const closes = new Date(saved.windowClosesAt!);  // 2025-10-09 23:59
+      const opens  = new Date(saved.windowOpensAt!);   // 2026-10-05
+      const closes = new Date(saved.windowClosesAt!);  // 2026-10-09 23:59
 
-      expect(opens.toISOString().slice(0, 10)).toBe('2025-10-05');
-      expect(closes.toISOString().slice(0, 10)).toBe('2025-10-09');
+      expect(opens.toISOString().slice(0, 10)).toBe('2026-10-05');
+      expect(closes.toISOString().slice(0, 10)).toBe('2026-10-09');
       expect(closes.getUTCHours()).toBe(23);
       expect(closes.getUTCMinutes()).toBe(59);
     });

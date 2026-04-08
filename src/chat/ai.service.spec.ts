@@ -173,12 +173,11 @@ GreenClean Гель для посуды 5L (арт. GC-028-5L):
 
   describe('isAiMode', () => {
     const mockDate = (isoString: string) => {
-      jest.spyOn(global, 'Date').mockImplementation(
-        (...args: any[]) => args.length ? new (Date as any)(...args) : new (Date as any)(isoString)
-      );
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(isoString));
     };
 
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => jest.useRealTimers());
 
     it('AI-режим в субботу', () => {
       mockDate('2025-03-22T11:00:00Z'); // суббота 11:00 UTC = 12:00 CET

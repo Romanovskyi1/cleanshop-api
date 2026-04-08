@@ -6,6 +6,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { PalletsService }            from './pallets.service';
 import { Pallet, PalletItem, PalletStatus } from './entities/pallet.entity';
 import { Truck }                     from '../orders/entities/truck.entity';
+import { Order }                     from '../orders/entities/order.entity';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const COMPANY_ID = 1;
@@ -99,6 +100,7 @@ describe('PalletsService', () => {
         { provide: getRepositoryToken(Pallet),     useValue: mockRepo<Pallet>() },
         { provide: getRepositoryToken(PalletItem), useValue: mockRepo<PalletItem>() },
         { provide: getRepositoryToken(Truck),      useValue: mockRepo<Truck>() },
+        { provide: getRepositoryToken(Order),      useValue: mockRepo<Order>() },
         { provide: DataSource,                     useValue: mockDataSource },
       ],
     }).compile();
@@ -177,7 +179,7 @@ describe('PalletsService', () => {
       mockDataSource.transaction.mockImplementationOnce(async (fn) => {
         const em = {
           findOne: jest.fn().mockResolvedValue(pallet),
-          find: jest.fn(),
+          find: jest.fn().mockResolvedValue([pallet]),
           create: jest.fn().mockImplementation((_, d) => ({ ...d })),
           save: jest.fn().mockResolvedValue({}),
           update: jest.fn(),
@@ -197,7 +199,10 @@ describe('PalletsService', () => {
     it('отклоняет некратное количество коробок', async () => {
       const pallet = makePallet({ items: [] });
       mockDataSource.transaction.mockImplementationOnce(async (fn) => {
-        const em = { findOne: jest.fn().mockResolvedValue(pallet) };
+        const em = {
+          findOne: jest.fn().mockResolvedValue(pallet),
+          find: jest.fn().mockResolvedValue([pallet]),
+        };
         return fn(em);
       });
 
@@ -206,12 +211,15 @@ describe('PalletsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('отклоняет переполнение паллеты (> 40 коробок)', async () => {
-      const existingItem = { productId: 99, boxes: 40, subtotalEur: 100 } as PalletItem;
-      const pallet = makePallet({ items: [existingItem], totalBoxes: 40 });
+    it('отклоняет переполнение паллеты (> 300 коробок)', async () => {
+      const existingItem = { productId: 99, boxes: 300, subtotalEur: 100 } as PalletItem;
+      const pallet = makePallet({ items: [existingItem], totalBoxes: 300 });
 
       mockDataSource.transaction.mockImplementationOnce(async (fn) => {
-        const em = { findOne: jest.fn().mockResolvedValue(pallet) };
+        const em = {
+          findOne: jest.fn().mockResolvedValue(pallet),
+          find: jest.fn().mockResolvedValue([pallet]),
+        };
         return fn(em);
       });
 

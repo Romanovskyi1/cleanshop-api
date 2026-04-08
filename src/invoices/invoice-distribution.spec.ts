@@ -1,3 +1,9 @@
+// Mock node-fetch (ESM-only v3) before any imports that transitively load it
+jest.mock('node-fetch', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
 import { Test, TestingModule }  from '@nestjs/testing';
 import { getRepositoryToken }   from '@nestjs/typeorm';
 import { ConfigService }        from '@nestjs/config';
