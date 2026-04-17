@@ -5,4 +5,4 @@ RUN npm ci
 COPY . .
 RUN npm run build
 EXPOSE 3000
-CMD ["node", "dist/src/main"]
+CMD ["sh", "-c", "npm run migration:run && node dist/src/main"]
