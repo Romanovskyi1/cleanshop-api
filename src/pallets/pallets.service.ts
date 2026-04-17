@@ -165,11 +165,9 @@ export class PalletsService {
         }
       }
 
-      // Проверка вместимости (коробки)
-      const currentBoxes   = pallet.items.reduce((s, i) => s + i.boxes, 0);
-      const existingItem   = pallet.items.find(i => i.productId === dto.productId);
-      const existingBoxes  = existingItem?.boxes ?? 0;
-      const newTotalBoxes  = currentBoxes - existingBoxes + dto.boxes;
+      // Проверка вместимости (коробки) — add-семантика: сколько будет ПОСЛЕ добавления
+      const existingItem  = pallet.items.find(i => i.productId === dto.productId);
+      const newTotalBoxes = pallet.totalBoxes + dto.boxes;
 
       if (newTotalBoxes > PALLET_MAX_BOXES) {
         throw new BadRequestException(
@@ -177,11 +175,9 @@ export class PalletsService {
         );
       }
 
-      // Проверка вместимости (вес)
-      const boxWeightKg    = productData.weightPerBoxKg ?? DEFAULT_BOX_WEIGHT_KG;
-      const currentWeight  = Number(pallet.totalWeightKg);
-      const existingWeight = existingBoxes * boxWeightKg;
-      const newWeight      = currentWeight - existingWeight + dto.boxes * boxWeightKg;
+      // Проверка вместимости (вес) — add-семантика: текущий вес + вес добавляемых коробок
+      const boxWeightKg = productData.weightPerBoxKg ?? DEFAULT_BOX_WEIGHT_KG;
+      const newWeight   = Number(pallet.totalWeightKg) + dto.boxes * boxWeightKg;
 
       if (newWeight > PALLET_MAX_WEIGHT_KG) {
         throw new BadRequestException(
