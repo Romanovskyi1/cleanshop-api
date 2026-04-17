@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, NotFoundException,
+  Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, NotFoundException, Headers,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository }       from 'typeorm';
@@ -98,6 +98,7 @@ export class PalletsController {
     @Param('id', ParseIntPipe) palletId: number,
     @CurrentUser() user: User,
     @Body() dto: AddPalletItemDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
   ) {
     const product = await this.products.findOne({ where: { id: dto.productId } });
     if (!product) throw new NotFoundException(`Товар #${dto.productId} не найден`);
@@ -106,7 +107,7 @@ export class PalletsController {
       unitsPerBox:    product.unitsPerBox,
       weightPerBoxKg: product.boxWeightKg ? Number(product.boxWeightKg) : undefined,
     };
-    return this.service.addItem(palletId, user.companyId, dto, productData);
+    return this.service.addItem(palletId, user.companyId, dto, productData, idempotencyKey);
   }
 
   /**

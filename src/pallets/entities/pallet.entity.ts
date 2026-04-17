@@ -89,6 +89,9 @@ export class PalletItem {
   @Column({ name: 'subtotal', type: 'decimal', precision: 14, scale: 2, insert: false, update: false })
   subtotalEur: number;
 
+  @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
+  idempotencyKey: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

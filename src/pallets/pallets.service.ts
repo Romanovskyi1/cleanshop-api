@@ -3,7 +3,7 @@ import {
   ForbiddenException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, DataSource, EntityManager, QueryFailedError } from 'typeorm';
 
 import { Pallet, PalletItem, PalletStatus } from './entities/pallet.entity';
 import { Truck }                            from '../orders/entities/truck.entity';
@@ -139,8 +139,15 @@ export class PalletsService {
     companyId: number,
     dto: AddPalletItemDto,
     productData: { priceEur: number; unitsPerBox: number; weightPerBoxKg?: number },
+    idempotencyKey?: string,
   ): Promise<PalletItem> {
-    return this.ds.transaction(async (em: EntityManager) => {
+    try {
+      return await this.ds.transaction(async (em: EntityManager) => {
+      if (idempotencyKey) {
+        const existing = await em.findOne(PalletItem, { where: { palletId, idempotencyKey } });
+        if (existing) return existing;
+      }
+
       const specifiedPallet = await em.findOne(Pallet, {
         where: { id: palletId, companyId },
       });
@@ -217,11 +224,12 @@ export class PalletsService {
         item.subtotalEur = Number((productData.priceEur * item.boxes).toFixed(2));
       } else {
         item = em.create(PalletItem, {
-          palletId:    pallet.id,
-          productId:   dto.productId,
-          priceEur:    productData.priceEur,
-          boxes:       dto.boxes,
-          subtotalEur: Number((productData.priceEur * dto.boxes).toFixed(2)),
+          palletId:       pallet.id,
+          productId:      dto.productId,
+          priceEur:       productData.priceEur,
+          boxes:          dto.boxes,
+          subtotalEur:    Number((productData.priceEur * dto.boxes).toFixed(2)),
+          idempotencyKey: idempotencyKey ?? null,
         });
       }
       await em.save(PalletItem, item);
@@ -230,7 +238,16 @@ export class PalletsService {
       await this.recalcPallet(em, pallet.id);
 
       return item;
-    });
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        const pg = err as QueryFailedError & { constraint?: string };
+        if (pg.constraint === 'chk_pallet_total_weight_max') {
+          throw new BadRequestException(`Превышен максимальный вес паллеты: максимум ${PALLET_MAX_WEIGHT_KG} кг`);
+        }
+      }
+      throw err;
+    }
   }
 
   /**
