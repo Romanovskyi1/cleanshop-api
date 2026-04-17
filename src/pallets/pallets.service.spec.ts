@@ -184,10 +184,11 @@ describe('PalletsService', () => {
           save: jest.fn().mockResolvedValue({}),
           update: jest.fn(),
           createQueryBuilder: jest.fn().mockReturnValue({
-            select: jest.fn().mockReturnThis(),
+            leftJoin:  jest.fn().mockReturnThis(),
+            select:    jest.fn().mockReturnThis(),
             addSelect: jest.fn().mockReturnThis(),
-            where: jest.fn().mockReturnThis(),
-            getRawOne: jest.fn().mockResolvedValue({ totalBoxes: '24', totalAmountEur: '297.60' }),
+            where:     jest.fn().mockReturnThis(),
+            getRawOne: jest.fn().mockResolvedValue({ totalBoxes: '24', totalAmountEur: '297.60', totalWeightKg: '360' }),
           }),
         };
         return fn(em);
@@ -224,6 +225,99 @@ describe('PalletsService', () => {
       await expect(
         service.addItem(1, COMPANY_ID, { productId: 1, boxes: 24 }, productData),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('НЕ консолидирует пустую паллету — item идёт в specifiedPallet', async () => {
+      const emptyPallet   = makePallet({ id: 1, totalBoxes: 0, items: [] });
+      const existingPallet = makePallet({ id: 2, totalBoxes: 48, totalWeightKg: 672, items: [
+        { productId: 1, boxes: 48 } as PalletItem,
+      ]});
+
+      let savedItemPalletId: number | undefined;
+      mockDataSource.transaction.mockImplementationOnce(async (fn) => {
+        const em = {
+          findOne: jest.fn().mockResolvedValue(emptyPallet),
+          find:    jest.fn().mockResolvedValue([emptyPallet, existingPallet]),
+          create:  jest.fn().mockImplementation((_, d) => {
+            savedItemPalletId = d.palletId;
+            return { ...d };
+          }),
+          save:    jest.fn().mockResolvedValue({}),
+          update:  jest.fn(),
+          createQueryBuilder: jest.fn().mockReturnValue({
+            leftJoin:   jest.fn().mockReturnThis(),
+            select:     jest.fn().mockReturnThis(),
+            addSelect:  jest.fn().mockReturnThis(),
+            where:      jest.fn().mockReturnThis(),
+            getRawOne:  jest.fn().mockResolvedValue({ totalBoxes: '48', totalAmountEur: '595.20', totalWeightKg: '672' }),
+          }),
+        };
+        return fn(em);
+      });
+
+      await service.addItem(1, COMPANY_ID, { productId: 1, boxes: 48 }, { priceEur: 12.40, unitsPerBox: 7, weightPerBoxKg: 14 });
+      expect(savedItemPalletId).toBe(emptyPallet.id);
+    });
+
+    it('консолидирует на существующую паллету если specifiedPallet непустая', async () => {
+      const nonEmptySpecified = makePallet({ id: 1, totalBoxes: 48, totalWeightKg: 672, items: [
+        { productId: 99, boxes: 48 } as PalletItem,
+      ]});
+      const existingItem = { id: 10, palletId: 2, productId: 1, boxes: 24 } as PalletItem;
+      const palletWithProduct = makePallet({ id: 2, totalBoxes: 24, totalWeightKg: 336, items: [existingItem] });
+
+      let savedItem: PalletItem | undefined;
+      mockDataSource.transaction.mockImplementationOnce(async (fn) => {
+        const em = {
+          findOne: jest.fn().mockResolvedValue(nonEmptySpecified),
+          find:    jest.fn().mockResolvedValue([nonEmptySpecified, palletWithProduct]),
+          create:  jest.fn().mockImplementation((_, d) => ({ ...d })),
+          save:    jest.fn().mockImplementation((_entity, item) => {
+            savedItem = item;
+            return Promise.resolve(item);
+          }),
+          update:  jest.fn(),
+          createQueryBuilder: jest.fn().mockReturnValue({
+            leftJoin:   jest.fn().mockReturnThis(),
+            select:     jest.fn().mockReturnThis(),
+            addSelect:  jest.fn().mockReturnThis(),
+            where:      jest.fn().mockReturnThis(),
+            getRawOne:  jest.fn().mockResolvedValue({ totalBoxes: '48', totalAmountEur: '595.20', totalWeightKg: '672' }),
+          }),
+        };
+        return fn(em);
+      });
+
+      await service.addItem(1, COMPANY_ID, { productId: 1, boxes: 24 }, { priceEur: 12.40, unitsPerBox: 7, weightPerBoxKg: 14 });
+      expect(savedItem?.palletId).toBe(palletWithProduct.id);
+    });
+
+    it('вторая паллета Płyn (14кг × 48) проходит без ошибки когда specifiedPallet пустая', async () => {
+      // Сценарий: на pallet1 уже есть Płyn + Żel, totalWeightKg=1440 (бывший баг).
+      // specifiedPallet (pallet2) пустая — создана checkout'ом для новой паллеты.
+      const specifiedEmpty = makePallet({ id: 2, totalBoxes: 0, totalWeightKg: 0, items: [] });
+
+      mockDataSource.transaction.mockImplementationOnce(async (fn) => {
+        const em = {
+          findOne: jest.fn().mockResolvedValue(specifiedEmpty),
+          find:    jest.fn(),
+          create:  jest.fn().mockImplementation((_, d) => ({ ...d })),
+          save:    jest.fn().mockResolvedValue({}),
+          update:  jest.fn(),
+          createQueryBuilder: jest.fn().mockReturnValue({
+            leftJoin:   jest.fn().mockReturnThis(),
+            select:     jest.fn().mockReturnThis(),
+            addSelect:  jest.fn().mockReturnThis(),
+            where:      jest.fn().mockReturnThis(),
+            getRawOne:  jest.fn().mockResolvedValue({ totalBoxes: '48', totalAmountEur: '595.20', totalWeightKg: '672' }),
+          }),
+        };
+        return fn(em);
+      });
+
+      await expect(
+        service.addItem(2, COMPANY_ID, { productId: 1, boxes: 48 }, { priceEur: 12.40, unitsPerBox: 7, weightPerBoxKg: 14 }),
+      ).resolves.not.toThrow();
     });
   });
 

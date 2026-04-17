@@ -147,9 +147,10 @@ export class PalletsService {
       if (!specifiedPallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
       this.assertEditable(specifiedPallet);
 
-      // Консолидация: ищем паллету заказа, где уже есть этот товар
+      // Консолидация: ищем паллету заказа, где уже есть этот товар.
+      // Пустая паллета (только что созданная) не консолидируется — она уже является целевой.
       let pallet = specifiedPallet;
-      if (specifiedPallet.orderId) {
+      if (specifiedPallet.orderId && specifiedPallet.totalBoxes > 0) {
         const orderPallets = await em.find(Pallet, {
           where: { orderId: specifiedPallet.orderId, companyId },
           relations: ['items'],
@@ -530,17 +531,21 @@ export class PalletsService {
   private async recalcPallet(em: EntityManager, palletId: number): Promise<void> {
     const rows = await em
       .createQueryBuilder(PalletItem, 'i')
-      .select('SUM(i.boxes)',        'totalBoxes')
+      .leftJoin('products', 'p', 'p.id = i.product_id')
+      .select('SUM(i.boxes)', 'totalBoxes')
       .addSelect('SUM(i.subtotal)', 'totalAmountEur')
+      .addSelect(
+        `SUM(i.boxes * COALESCE(CAST(p.box_weight_kg AS FLOAT), ${DEFAULT_BOX_WEIGHT_KG}))`,
+        'totalWeightKg',
+      )
       .where('i.pallet_id = :palletId', { palletId })
-      .getRawOne<{ totalBoxes: string; totalAmountEur: string }>();
+      .getRawOne<{ totalBoxes: string; totalAmountEur: string; totalWeightKg: string }>();
 
-    const totalBoxes      = Number(rows?.totalBoxes      ?? 0);
-    const totalAmountEur  = Number(rows?.totalAmountEur  ?? 0);
-    // Используем дефолтный вес на коробку — точный вес приходит из products
-    const totalWeightKg   = totalBoxes * DEFAULT_BOX_WEIGHT_KG;
-
-    await em.update(Pallet, palletId, { totalBoxes, totalWeightKg, totalAmountEur });
+    await em.update(Pallet, palletId, {
+      totalBoxes:     Number(rows?.totalBoxes     ?? 0),
+      totalWeightKg:  Number(rows?.totalWeightKg  ?? 0),
+      totalAmountEur: Number(rows?.totalAmountEur ?? 0),
+    });
   }
 
   /** Авто-распределение нераспределённых паллет по фурам (равномерно по весу). */
