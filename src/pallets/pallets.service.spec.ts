@@ -292,6 +292,43 @@ describe('PalletsService', () => {
       expect(savedItem?.palletId).toBe(palletWithProduct.id);
     });
 
+    it('лимит паллет не учитывает пустые orphan-паллеты', async () => {
+      // 27 реальных паллет + 13 orphan (totalBoxes=0) → итого 40 в БД, но лимит 33
+      const realPallets  = Array.from({ length: 27 }, (_, i) =>
+        makePallet({ id: i + 1, totalBoxes: 48, totalWeightKg: 672 }),
+      );
+      const orphanPallets = Array.from({ length: 13 }, (_, i) =>
+        makePallet({ id: 100 + i, totalBoxes: 0, totalWeightKg: 0 }),
+      );
+      const emptyTarget = makePallet({ id: 200, totalBoxes: 0, totalWeightKg: 0 });
+      const allPallets  = [...realPallets, ...orphanPallets, emptyTarget];
+
+      mockDataSource.transaction.mockImplementationOnce(async (fn) => {
+        const em = {
+          findOne: jest.fn()
+            .mockResolvedValueOnce(emptyTarget)                      // specifiedPallet
+            .mockResolvedValueOnce({ id: ORDER_ID, truckType: 'large_24t' }), // order
+          find:    jest.fn().mockResolvedValue(allPallets),
+          create:  jest.fn().mockImplementation((_, d) => ({ ...d })),
+          save:    jest.fn().mockResolvedValue({}),
+          delete:  jest.fn(),
+          update:  jest.fn(),
+          createQueryBuilder: jest.fn().mockReturnValue({
+            leftJoin:  jest.fn().mockReturnThis(),
+            select:    jest.fn().mockReturnThis(),
+            addSelect: jest.fn().mockReturnThis(),
+            where:     jest.fn().mockReturnThis(),
+            getRawOne: jest.fn().mockResolvedValue({ totalBoxes: '48', totalAmountEur: '595.20', totalWeightKg: '672' }),
+          }),
+        };
+        return fn(em);
+      });
+
+      await expect(
+        service.addItem(200, COMPANY_ID, { productId: 1, boxes: 48 }, { priceEur: 12.40, unitsPerBox: 7, weightPerBoxKg: 14 }),
+      ).resolves.not.toThrow();
+    });
+
     it('вторая паллета Płyn (14кг × 48) проходит без ошибки когда specifiedPallet пустая', async () => {
       // Сценарий: на pallet1 уже есть Płyn + Żel, totalWeightKg=1440 (бывший баг).
       // specifiedPallet (pallet2) пустая — создана checkout'ом для новой паллеты.

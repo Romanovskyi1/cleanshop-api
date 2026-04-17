@@ -196,8 +196,8 @@ export class PalletsService {
           const limits = TRUCK_LIMITS[order.truckType];
 
           const orderPallets = await em.find(Pallet, { where: { orderId: pallet.orderId } });
-          const currentPallets       = orderPallets.length;
-          const currentOrderWeightKg = orderPallets.reduce((s, p) => s + Number(p.totalWeightKg), 0);
+          const currentPallets       = orderPallets.filter(p => p.totalBoxes > 0).length;
+          const currentOrderWeightKg = orderPallets.filter(p => p.totalBoxes > 0).reduce((s, p) => s + Number(p.totalWeightKg), 0);
           const newOrderWeightKg     = currentOrderWeightKg + dto.boxes * boxWeightKg;
 
           if (currentPallets > limits.maxPallets) {
