@@ -14,10 +14,10 @@ export class BackfillProductPhysics1700000014000 implements MigrationInterface {
 
   async up(queryRunner: QueryRunner): Promise<void> {
     // ── 1. Backfill активных SKU ─────────────────────────────────────────
-    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 672.00 WHERE sku = 'AQ-115-1L'`);
-    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 576.00 WHERE sku = 'Dixan'`);
-    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 835.20 WHERE sku = '121'`);
-    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 648.00 WHERE sku = 'gel'`);
+    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 672.00 WHERE TRIM(sku) = 'AQ-115-1L'`);
+    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 576.00 WHERE TRIM(sku) = 'Dixan'`);
+    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 835.20 WHERE TRIM(sku) = '121'`);
+    await queryRunner.query(`UPDATE products SET pallet_weight_kg = 648.00 WHERE TRIM(sku) = 'gel'`);
 
     // ── 2. Деактивация SKU без физических данных (не в админ-панели) ─────
     await queryRunner.query(`
