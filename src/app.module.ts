@@ -18,7 +18,7 @@ import { Company }     from './companies/entities/company.entity';
 import { Order }       from './orders/entities/order.entity';
 import { OrderStatusHistory } from './orders/entities/order-status-history.entity';
 import { Truck }       from './orders/entities/truck.entity';
-import { Pallet, PalletItem } from './pallets/entities/pallet.entity';
+import { Pallet } from './pallets/entities/pallet.entity';
 import { Invoice, InvoiceDelivery } from './invoices/entities/invoice.entity';
 import { ChatMessage } from './chat/entities/chat-message.entity';
 
@@ -37,7 +37,7 @@ import { ChatMessage } from './chat/entities/chat-message.entity';
       useFactory: (config: ConfigService) => ({
         type:        'postgres',
         url:         config.getOrThrow<string>('DATABASE_URL'),
-        entities:    [User, Product, Company, Order, OrderStatusHistory, Truck, Pallet, PalletItem, Invoice, InvoiceDelivery, ChatMessage],   // добавлять по мере создания сущностей
+        entities:    [User, Product, Company, Order, OrderStatusHistory, Truck, Pallet, Invoice, InvoiceDelivery, ChatMessage],   // добавлять по мере создания сущностей
         synchronize: config.get('NODE_ENV') === 'development', // ТОЛЬКО dev
         logging:     config.get('NODE_ENV') === 'development',
         ssl: config.get('NODE_ENV') === 'production'

@@ -7,8 +7,13 @@
 - Package manager: npm
 
 ## Key paths
-- Frontend: /Users/romanovskaya/Downloads/CHCH/files/Фронтенд/cleanshop-tma
-- Backend: /Users/romanovskaya/Downloads/cleanshop/cleanshop-api
+- API:     /Users/romanovskaya/Projects/cleanshop/cleanshop-api
+- Manager: /Users/romanovskaya/Projects/cleanshop/cleanshop-manager
+- TMA:     /Users/romanovskaya/Projects/cleanshop/cleanshop-tma
+
+## Domain
+- Паллета = 1 SKU (моно-паллета). См. ~/.claude/memory/cleanshop/DOMAIN.md
+- Источник истины физики паллеты: products (boxes_per_pallet, pallet_weight_kg, box_weight_kg, units_per_box)
 
 ## Rules
 - Always run npm run build before railway up --service
@@ -17,5 +22,6 @@
 - Use --detach flag for railway up
 
 ## Active services
-- API: https://cleanshop-api-production.up.railway.app
-- TMA: https://cleanshop-tma-production.up.railway.app
+- API:     https://cleanshop-api-production.up.railway.app
+- TMA:     https://cleanshop-tma-production.up.railway.app
+- Manager: https://cleanshop-manager-production.up.railway.app

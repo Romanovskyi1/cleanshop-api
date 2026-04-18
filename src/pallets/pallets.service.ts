@@ -5,31 +5,25 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, QueryFailedError } from 'typeorm';
 
-import { Pallet, PalletItem, PalletStatus } from './entities/pallet.entity';
-import { Truck }                            from '../orders/entities/truck.entity';
-import { Order, TruckType }                 from '../orders/entities/order.entity';
+import { Pallet, PalletStatus }              from './entities/pallet.entity';
+import { Product }                           from '../products/entities/product.entity';
+import { Truck }                             from '../orders/entities/truck.entity';
+import { Order, TruckType }                  from '../orders/entities/order.entity';
 import {
   CreatePalletDto, UpdatePalletDto,
-  AddPalletItemDto, UpdatePalletItemDto,
-  AssignPalletsToTruckDto, PalletQueryDto,
+  AddPalletsDto, AssignPalletsToTruckDto, PalletQueryDto,
 } from './dto/pallet.dto';
 
-// Стандартные ограничения паллеты
-const PALLET_MAX_BOXES       = 300;  // максимум коробок на паллете
-const PALLET_MAX_WEIGHT_KG   = 1000; // кг
-
-// Ограничения грузовиков
+// Лимиты транспорта — физика, не продукта.
 const TRUCK_LIMITS: Record<TruckType, { maxPallets: number; maxWeightKg: number }> = {
   [TruckType.SMALL_5T]:  { maxPallets: 12, maxWeightKg: 5_000  },
   [TruckType.LARGE_24T]: { maxPallets: 33, maxWeightKg: 24_000 },
 };
 
-// Средний вес одной коробки (если у продукта нет точного веса)
-const DEFAULT_BOX_WEIGHT_KG  = 15;
-
-// Минимум коробок — кратность (будет браться из products.units_per_box,
-// здесь как дефолт)
-const DEFAULT_BOX_UNIT = 1;
+interface ProductPhysics {
+  palletWeightKg: number;
+  boxesPerPallet: number;
+}
 
 @Injectable()
 export class PalletsService {
@@ -39,14 +33,14 @@ export class PalletsService {
     @InjectRepository(Pallet)
     private readonly pallets: Repository<Pallet>,
 
-    @InjectRepository(PalletItem)
-    private readonly items: Repository<PalletItem>,
-
     @InjectRepository(Truck)
     private readonly trucks: Repository<Truck>,
 
     @InjectRepository(Order)
     private readonly orders: Repository<Order>,
+
+    @InjectRepository(Product)
+    private readonly products: Repository<Product>,
 
     private readonly ds: DataSource,
   ) {}
@@ -55,290 +49,210 @@ export class PalletsService {
   // ПАЛЛЕТЫ — CRUD
   // ══════════════════════════════════════════════════════════════════════
 
-  /**
-   * Получить все паллеты компании (опционально — фильтр по заказу/статусу).
-   */
   async findAll(companyId: number, query: PalletQueryDto): Promise<Pallet[]> {
     const qb = this.pallets
       .createQueryBuilder('p')
-      .leftJoinAndSelect('p.items', 'items')
+      .leftJoinAndSelect('p.product', 'product')
       .where('p.company_id = :companyId', { companyId })
       .orderBy('p.created_at', 'ASC');
 
-    if (query.orderId) {
-      qb.andWhere('p.order_id = :orderId', { orderId: query.orderId });
-    }
-    if (query.status) {
-      qb.andWhere('p.status = :status', { status: query.status });
-    }
+    if (query.orderId) qb.andWhere('p.order_id = :orderId', { orderId: query.orderId });
+    if (query.status)  qb.andWhere('p.status   = :status',  { status:  query.status });
 
     return qb.getMany();
   }
 
-  /**
-   * Получить одну паллету (проверка владельца).
-   */
   async findOne(id: number, companyId: number): Promise<Pallet> {
     const pallet = await this.pallets.findOne({
       where: { id, companyId },
-      relations: ['items'],
+      relations: ['product'],
     });
     if (!pallet) throw new NotFoundException(`Паллета #${id} не найдена`);
     return pallet;
   }
 
   /**
-   * Создать новую пустую паллету.
+   * Низкоуровневое создание паллеты (без авто-консолидации).
+   * Для продакшн-флоу используй addPallets().
    */
   async create(companyId: number, dto: CreatePalletDto): Promise<Pallet> {
+    const product = await this.products.findOne({ where: { id: dto.productId } });
+    if (!product) throw new NotFoundException(`Товар #${dto.productId} не найден`);
+    this.assertProductPhysics(product);
+
     const pallet = this.pallets.create({
       companyId,
-      orderId: dto.orderId ?? null,
-      name:    dto.name ?? '',
-      status:  PalletStatus.BUILDING,
+      orderId:      dto.orderId ?? null,
+      name:         dto.name    ?? '',
+      productId:    dto.productId,
+      palletsCount: dto.palletsCount ?? 1,
+      status:       PalletStatus.BUILDING,
+      isLegacy:     false,
     });
     return this.pallets.save(pallet);
   }
 
   /**
-   * Обновить паллету (имя, назначение в фуру).
+   * Обновить паллету (имя, фуру, количество паллет).
+   * palletsCount === 0 → удалить (возврат null).
    */
-  async update(id: number, companyId: number, dto: UpdatePalletDto): Promise<Pallet> {
-    const pallet = await this.findOne(id, companyId);
-    this.assertEditable(pallet);
-
-    if (dto.name !== undefined)    pallet.name    = dto.name ?? '';
-    if (dto.truckId !== undefined) {
-      await this.assignToTruck(pallet, dto.truckId);
+  async update(id: number, companyId: number, dto: UpdatePalletDto): Promise<Pallet | null> {
+    if (dto.palletsCount !== undefined) {
+      const result = await this.updatePalletsCount(id, companyId, dto.palletsCount);
+      if (!result) return null; // удалена
+      if (dto.name !== undefined)    result.name = dto.name ?? '';
+      if (dto.truckId !== undefined) {
+        this.assertEditableForContentChange(result);
+        await this.assignToTruck(result, dto.truckId);
+      }
+      return this.pallets.save(result);
     }
 
+    const pallet = await this.findOne(id, companyId);
+
+    // Для legacy разрешаем смену truck/name, но не редактирование "контента".
+    if (dto.name !== undefined)    pallet.name = dto.name ?? '';
+    if (dto.truckId !== undefined) await this.assignToTruck(pallet, dto.truckId);
     return this.pallets.save(pallet);
   }
 
-  /**
-   * Удалить паллету (только если редактируемая).
-   */
   async remove(id: number, companyId: number): Promise<void> {
     const pallet = await this.findOne(id, companyId);
-    this.assertEditable(pallet);
+    this.assertEditableForContentChange(pallet);
     await this.pallets.remove(pallet);
     this.logger.log(`Удалена паллета #${id} компании ${companyId}`);
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // ПОЗИЦИИ ПАЛЛЕТЫ — CRUD
+  // ДОМЕННЫЙ ВХОД: добавить N паллет SKU в заказ
   // ══════════════════════════════════════════════════════════════════════
 
-  /**
-   * Добавить товар в паллету.
-   * Если товар уже есть — увеличивает количество.
-   * Проверяет вместимость и кратность.
-   */
-  async addItem(
-    palletId: number,
+  async addPallets(
+    orderId: number,
     companyId: number,
-    dto: AddPalletItemDto,
-    productData: { priceEur: number; unitsPerBox: number; weightPerBoxKg?: number },
+    dto: AddPalletsDto,
     idempotencyKey?: string,
-  ): Promise<PalletItem> {
+  ): Promise<Pallet> {
     try {
       return await this.ds.transaction(async (em: EntityManager) => {
-      if (idempotencyKey) {
-        const existing = await em.findOne(PalletItem, { where: { palletId, idempotencyKey } });
-        if (existing) return existing;
-      }
+        // 1. Идемпотентность на уровне (orderId, idempotencyKey)
+        if (idempotencyKey) {
+          const existing = await em.findOne(Pallet, {
+            where: { orderId, idempotencyKey, companyId },
+            relations: ['product'],
+          });
+          if (existing) return existing;
+        }
 
-      const specifiedPallet = await em.findOne(Pallet, {
-        where: { id: palletId, companyId },
-      });
-      if (!specifiedPallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
-      this.assertEditable(specifiedPallet);
-
-      // Консолидация: ищем паллету заказа, где уже есть этот товар.
-      // Пустая паллета (только что созданная) не консолидируется — она уже является целевой.
-      let pallet = specifiedPallet;
-      if (specifiedPallet.orderId && specifiedPallet.totalBoxes > 0) {
-        const orderPallets = await em.find(Pallet, {
-          where: { orderId: specifiedPallet.orderId, companyId },
-          relations: ['items'],
+        // 2. Lock заказа (сериализуем конкурентные добавления)
+        const order = await em.findOne(Order, {
+          where: { id: orderId, companyId },
+          lock: { mode: 'pessimistic_write' },
         });
-        const palletWithProduct = orderPallets.find(
-          p => p.id !== specifiedPallet.id &&
-               p.isEditable &&
-               p.items.some(i => i.productId === dto.productId),
-        );
-        if (palletWithProduct) {
-          pallet = palletWithProduct;
+        if (!order) throw new NotFoundException(`Заказ #${orderId} не найден`);
+
+        // 3. Продукт и его физика
+        const product = await em.findOne(Product, { where: { id: dto.productId } });
+        if (!product) throw new NotFoundException(`Товар #${dto.productId} не найден`);
+        this.assertProductPhysics(product);
+
+        const physics: ProductPhysics = {
+          palletWeightKg: Number(product.palletWeightKg),
+          boxesPerPallet: product.boxesPerPallet,
+        };
+
+        // 4. Валидация лимитов фуры ДО изменений
+        if (order.truckType) {
+          await this.validateTruckLimits(em, orderId, order.truckType, product.id, dto.palletsCount, physics);
         }
-      }
 
-      // Проверка вместимости (коробки) — add-семантика: сколько будет ПОСЛЕ добавления
-      const existingItem  = pallet.items.find(i => i.productId === dto.productId);
-      const newTotalBoxes = pallet.totalBoxes + dto.boxes;
+        // 5. Консолидация: ищем редактируемую non-legacy паллету того же SKU
+        const existing = await em.findOne(Pallet, {
+          where: {
+            orderId,
+            companyId,
+            productId: dto.productId,
+            isLegacy: false,
+            status: PalletStatus.BUILDING,
+          },
+          relations: ['product'],
+        });
 
-      if (newTotalBoxes > PALLET_MAX_BOXES) {
-        throw new BadRequestException(
-          `Паллета переполнена: ${newTotalBoxes} кор. > максимум ${PALLET_MAX_BOXES} кор.`,
-        );
-      }
-
-      // Проверка вместимости (вес) — add-семантика: текущий вес + вес добавляемых коробок
-      const boxWeightKg = productData.weightPerBoxKg ?? DEFAULT_BOX_WEIGHT_KG;
-      const newWeight   = Number(pallet.totalWeightKg) + dto.boxes * boxWeightKg;
-
-      if (newWeight > PALLET_MAX_WEIGHT_KG) {
-        throw new BadRequestException(
-          `Превышен максимальный вес паллеты: ${newWeight.toFixed(0)} кг > ${PALLET_MAX_WEIGHT_KG} кг`,
-        );
-      }
-
-      // Проверка лимитов грузовика
-      if (pallet.orderId) {
-        const order = await em.findOne(Order, { where: { id: pallet.orderId } });
-        if (order?.truckType) {
-          const limits = TRUCK_LIMITS[order.truckType];
-
-          const orderPallets = await em.find(Pallet, { where: { orderId: pallet.orderId } });
-          const currentPallets       = orderPallets.filter(p => p.totalBoxes > 0).length;
-          const currentOrderWeightKg = orderPallets.filter(p => p.totalBoxes > 0).reduce((s, p) => s + Number(p.totalWeightKg), 0);
-          const newOrderWeightKg     = currentOrderWeightKg + dto.boxes * boxWeightKg;
-
-          if (currentPallets > limits.maxPallets) {
-            throw new BadRequestException(
-              `Превышен лимит паллет: ${currentPallets} из ${limits.maxPallets}`,
-            );
+        if (existing) {
+          existing.palletsCount = existing.palletsCount + dto.palletsCount;
+          if (idempotencyKey && !existing.idempotencyKey) {
+            existing.idempotencyKey = idempotencyKey;
           }
-          if (newOrderWeightKg > limits.maxWeightKg) {
-            throw new BadRequestException(
-              `Превышен лимит веса грузовика: ${newOrderWeightKg.toFixed(0)}кг из ${limits.maxWeightKg}кг`,
-            );
-          }
+          return em.save(Pallet, existing);
         }
-      }
 
-      // Сохраняем или обновляем позицию в целевой паллете
-      let item = existingItem;
-      if (item) {
-        item.boxes       = item.boxes + dto.boxes;
-        item.priceEur    = productData.priceEur;
-        item.subtotalEur = Number((productData.priceEur * item.boxes).toFixed(2));
-      } else {
-        item = em.create(PalletItem, {
-          palletId:       pallet.id,
-          productId:      dto.productId,
-          priceEur:       productData.priceEur,
-          boxes:          dto.boxes,
-          subtotalEur:    Number((productData.priceEur * dto.boxes).toFixed(2)),
+        // 6. Создаём новую
+        const fresh = em.create(Pallet, {
+          companyId,
+          orderId,
+          productId: dto.productId,
+          palletsCount: dto.palletsCount,
+          name: '',
+          status: PalletStatus.BUILDING,
+          isLegacy: false,
           idempotencyKey: idempotencyKey ?? null,
         });
-      }
-      await em.save(PalletItem, item);
-
-      // Пересчитываем агрегаты целевой паллеты
-      await this.recalcPallet(em, pallet.id);
-
-      return item;
+        const saved = await em.save(Pallet, fresh);
+        // Переподтягиваем с product для корректных computed getters в ответе
+        const withProduct = await em.findOne(Pallet, { where: { id: saved.id }, relations: ['product'] });
+        return withProduct ?? saved;
       });
     } catch (err) {
-      if (err instanceof QueryFailedError) {
-        const pg = err as QueryFailedError & { constraint?: string };
-        if (pg.constraint === 'chk_pallet_total_weight_max') {
-          throw new BadRequestException(`Превышен максимальный вес паллеты: максимум ${PALLET_MAX_WEIGHT_KG} кг`);
-        }
+      // Идемпотентность через partial unique index: при гонке два запроса
+      // с одним ключом — второй получит 23505 и должен вернуть существующую запись.
+      if (err instanceof QueryFailedError && (err as QueryFailedError & { code?: string }).code === '23505' && idempotencyKey) {
+        const existing = await this.pallets.findOne({
+          where: { orderId, idempotencyKey, companyId },
+          relations: ['product'],
+        });
+        if (existing) return existing;
       }
       throw err;
     }
   }
 
   /**
-   * Найти позицию по id (для получения productId в контроллере).
+   * Установить точное количество паллет (SET-семантика).
+   * 0 → удалить.
    */
-  async findItemById(itemId: number, palletId: number): Promise<PalletItem> {
-    const item = await this.items.findOne({ where: { id: itemId, palletId } });
-    if (!item) throw new NotFoundException(`Позиция #${itemId} не найдена`);
-    return item;
-  }
-
-  /**
-   * Установить точное количество коробок в позиции (SET, не ADD).
-   * При boxes = 0 удаляет позицию.
-   */
-  async updateItem(
+  async updatePalletsCount(
     palletId: number,
-    itemId: number,
     companyId: number,
-    dto: UpdatePalletItemDto,
-    productData: { priceEur: number; unitsPerBox: number; weightPerBoxKg?: number },
-  ): Promise<PalletItem> {
+    newCount: number,
+  ): Promise<Pallet | null> {
     return this.ds.transaction(async (em: EntityManager) => {
       const pallet = await em.findOne(Pallet, {
         where: { id: palletId, companyId },
+        relations: ['product'],
       });
       if (!pallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
-      this.assertEditable(pallet);
+      this.assertEditableForContentChange(pallet);
 
-      const item = pallet.items.find(i => i.id === itemId);
-      if (!item) throw new NotFoundException(`Позиция #${itemId} не найдена`);
-
-      const oldBoxes    = item.boxes;
-      const newBoxes    = dto.boxes;
-      const boxWeightKg = productData.weightPerBoxKg ?? DEFAULT_BOX_WEIGHT_KG;
-
-      if (newBoxes <= 0) {
-        await em.remove(PalletItem, item);
-        await this.recalcPallet(em, palletId);
-        return item;
+      if (newCount === 0) {
+        await em.remove(Pallet, pallet);
+        return null;
       }
 
-      // Проверка вместимости (коробки)
-      const currentBoxes  = pallet.items.reduce((s, i) => s + i.boxes, 0);
-      const newTotalBoxes = currentBoxes - oldBoxes + newBoxes;
-
-      // Проверка вместимости (вес)
-      const currentWeight = Number(pallet.totalWeightKg);
-      const newWeight     = currentWeight - oldBoxes * boxWeightKg + newBoxes * boxWeightKg;
-
-      // Capacity validation only applies when INCREASING boxes — reducing can never overflow
-      if (newBoxes > oldBoxes) {
-        if (newTotalBoxes > PALLET_MAX_BOXES) {
-          throw new BadRequestException(
-            `Паллета переполнена: ${newTotalBoxes} кор. > максимум ${PALLET_MAX_BOXES} кор.`,
-          );
-        }
-        if (newWeight > PALLET_MAX_WEIGHT_KG) {
-          throw new BadRequestException(
-            `Превышен максимальный вес паллеты: ${newWeight.toFixed(0)} кг > ${PALLET_MAX_WEIGHT_KG} кг`,
+      const delta = newCount - pallet.palletsCount;
+      if (delta > 0 && pallet.orderId) {
+        const order = await em.findOne(Order, { where: { id: pallet.orderId } });
+        if (order?.truckType) {
+          await this.validateTruckLimits(
+            em, pallet.orderId, order.truckType,
+            pallet.productId, delta,
+            { palletWeightKg: Number(pallet.product.palletWeightKg), boxesPerPallet: pallet.product.boxesPerPallet },
+            pallet.id,
           );
         }
       }
 
-      // SET нового значения
-      item.boxes       = newBoxes;
-      item.priceEur    = productData.priceEur;
-      item.subtotalEur = Number((productData.priceEur * newBoxes).toFixed(2));
-      await em.save(PalletItem, item);
-
-      await this.recalcPallet(em, palletId);
-      return item;
-    });
-  }
-
-  /**
-   * Удалить позицию из паллеты.
-   */
-  async removeItem(palletId: number, itemId: number, companyId: number): Promise<void> {
-    return this.ds.transaction(async (em: EntityManager) => {
-      const pallet = await em.findOne(Pallet, {
-        where: { id: palletId, companyId },
-      });
-      if (!pallet) throw new NotFoundException(`Паллета #${palletId} не найдена`);
-      this.assertEditable(pallet);
-
-      const item = await em.findOne(PalletItem, { where: { id: itemId, palletId } });
-      if (!item) throw new NotFoundException(`Позиция #${itemId} не найдена`);
-
-      await em.remove(PalletItem, item);
-      await this.recalcPallet(em, palletId);
+      pallet.palletsCount = newCount;
+      return em.save(Pallet, pallet);
     });
   }
 
@@ -346,11 +260,6 @@ export class PalletsService {
   // ПЛАНИРОВЩИК ФУР
   // ══════════════════════════════════════════════════════════════════════
 
-  /**
-   * Назначить набор паллет в конкретную фуру.
-   * Снимает предыдущее назначение и проставляет новое.
-   * Проверяет вместимость фуры.
-   */
   async assignPalletsToTruck(
     truckId: number,
     orderId: number,
@@ -358,14 +267,12 @@ export class PalletsService {
     dto: AssignPalletsToTruckDto,
   ): Promise<{ truck: Truck; pallets: Pallet[] }> {
     return this.ds.transaction(async (em: EntityManager) => {
-      // Загружаем фуру с блокировкой
       const truck = await em.findOne(Truck, {
         where: { id: truckId, orderId },
         lock: { mode: 'pessimistic_write' },
       });
       if (!truck) throw new NotFoundException(`Фура #${truckId} не найдена`);
 
-      // Снимаем старые назначения этой фуры
       await em.update(
         Pallet,
         { truckId, companyId },
@@ -373,14 +280,12 @@ export class PalletsService {
       );
 
       if (dto.palletIds.length === 0) {
-        // Просто очистили фуру
         return { truck, pallets: [] };
       }
 
-      // Загружаем запрошенные паллеты
       const pallets = await em.find(Pallet, {
         where: dto.palletIds.map(pid => ({ id: pid, companyId })),
-        relations: ['items'],
+        relations: ['product'],
       });
 
       if (pallets.length !== dto.palletIds.length) {
@@ -389,7 +294,6 @@ export class PalletsService {
         );
       }
 
-      // Проверяем что паллеты редактируемые
       const locked = pallets.filter(p => p.status === PalletStatus.LOCKED);
       if (locked.length) {
         throw new ForbiddenException(
@@ -397,13 +301,12 @@ export class PalletsService {
         );
       }
 
-      // Считаем суммарные параметры
-      const totalPallets = pallets.length;
-      const totalWeight  = pallets.reduce((s, p) => s + Number(p.totalWeightKg), 0);
+      const totalPalletSlots = pallets.reduce((s, p) => s + p.palletsCount, 0);
+      const totalWeight      = pallets.reduce((s, p) => s + p.totalWeightKg, 0);
 
-      if (totalPallets > truck.maxPallets) {
+      if (totalPalletSlots > truck.maxPallets) {
         throw new BadRequestException(
-          `Фура вмещает ${truck.maxPallets} паллет, запрошено ${totalPallets}`,
+          `Фура вмещает ${truck.maxPallets} паллет, запрошено ${totalPalletSlots}`,
         );
       }
       if (totalWeight > Number(truck.maxWeightKg)) {
@@ -412,7 +315,6 @@ export class PalletsService {
         );
       }
 
-      // Назначаем паллеты
       for (const pallet of pallets) {
         pallet.truckId = truckId;
         pallet.orderId = orderId;
@@ -421,20 +323,14 @@ export class PalletsService {
       await em.save(Pallet, pallets);
 
       this.logger.log(
-        `Фура #${truckId}: назначено ${totalPallets} пал., ${totalWeight.toFixed(0)} кг`,
+        `Фура #${truckId}: назначено ${totalPalletSlots} пал., ${totalWeight.toFixed(0)} кг`,
       );
 
       return { truck, pallets };
     });
   }
 
-  /**
-   * Убрать паллету из фуры (переводит в статус READY).
-   */
-  async removePalletFromTruck(
-    palletId: number,
-    companyId: number,
-  ): Promise<Pallet> {
+  async removePalletFromTruck(palletId: number, companyId: number): Promise<Pallet> {
     const pallet = await this.findOne(palletId, companyId);
 
     if (pallet.status === PalletStatus.LOCKED) {
@@ -446,10 +342,6 @@ export class PalletsService {
     return this.pallets.save(pallet);
   }
 
-  /**
-   * Получить сводку по фурам заказа:
-   * каждая фура + список назначенных паллет + % заполнения.
-   */
   async getTrucksSummary(
     orderId: number,
     companyId: number,
@@ -461,63 +353,49 @@ export class PalletsService {
     palletFillPct: number;
     weightFillPct: number;
   }>> {
-    const trucks = await this.trucks.find({
-      where: { orderId },
-      order: { number: 'ASC' },
-    });
+    const trucks = await this.trucks.find({ where: { orderId }, order: { number: 'ASC' } });
 
     const allPallets = await this.pallets.find({
       where: { orderId, companyId },
-      relations: ['items'],
+      relations: ['product'],
     });
 
     return trucks.map(truck => {
       const pallets       = allPallets.filter(p => p.truckId === truck.id);
-      const totalWeightKg = pallets.reduce((s, p) => s + Number(p.totalWeightKg), 0);
+      const palletCount   = pallets.reduce((s, p) => s + p.palletsCount, 0);
+      const totalWeightKg = pallets.reduce((s, p) => s + p.totalWeightKg, 0);
 
       return {
         truck,
         pallets,
-        palletCount:   pallets.length,
+        palletCount,
         totalWeightKg,
-        palletFillPct: Math.round((pallets.length / truck.maxPallets) * 100),
+        palletFillPct: Math.round((palletCount   / truck.maxPallets) * 100),
         weightFillPct: Math.round((totalWeightKg / Number(truck.maxWeightKg)) * 100),
       };
     });
   }
 
-  /**
-   * Получить нераспределённые паллеты заказа.
-   */
   async getUnassigned(orderId: number, companyId: number): Promise<Pallet[]> {
     return this.pallets.find({
       where: { orderId, companyId, truckId: null },
-      relations: ['items'],
+      relations: ['product'],
       order: { createdAt: 'ASC' },
     });
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // БЛОКИРОВКА (вызывается Cron-сервисом при закрытии окна)
+  // БЛОКИРОВКА (при закрытии окна)
   // ══════════════════════════════════════════════════════════════════════
 
-  /**
-   * Заблокировать все паллеты заказа.
-   * Вызывается при закрытии окна редактирования (Cron / event).
-   * Если есть нераспределённые — применяется авто-распределение.
-   */
-  async lockAll(orderId: number, companyId: number): Promise<{
-    locked: number;
-    autoAssigned: number;
-  }> {
+  async lockAll(orderId: number, companyId: number): Promise<{ locked: number; autoAssigned: number }> {
     return this.ds.transaction(async (em: EntityManager) => {
       const unassigned = await em.find(Pallet, {
         where: { orderId, companyId, truckId: null },
+        relations: ['product'],
       });
 
       let autoAssigned = 0;
-
-      // Авто-распределение по первой незаполненной фуре
       if (unassigned.length > 0) {
         autoAssigned = await this.autoDistribute(em, orderId, unassigned);
       }
@@ -537,54 +415,73 @@ export class PalletsService {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // PRIVATE HELPERS
+  // PRIVATE
   // ══════════════════════════════════════════════════════════════════════
 
-  /** Пересчитать агрегаты паллеты после изменения позиций. */
-  private async recalcPallet(em: EntityManager, palletId: number): Promise<void> {
-    const rows = await em
-      .createQueryBuilder(PalletItem, 'i')
-      .leftJoin('products', 'p', 'p.id = i.product_id')
-      .select('SUM(i.boxes)', 'totalBoxes')
-      .addSelect('SUM(i.subtotal)', 'totalAmountEur')
-      .addSelect(
-        `SUM(i.boxes * COALESCE(CAST(p.box_weight_kg AS FLOAT), ${DEFAULT_BOX_WEIGHT_KG}))`,
-        'totalWeightKg',
-      )
-      .where('i.pallet_id = :palletId', { palletId })
-      .getRawOne<{ totalBoxes: string; totalAmountEur: string; totalWeightKg: string }>();
+  /**
+   * Проверка лимитов фуры с учётом добавляемых паллет SKU.
+   * `excludePalletId` — при апдейте исключаем самих себя из текущей суммы.
+   */
+  private async validateTruckLimits(
+    em: EntityManager,
+    orderId: number,
+    truckType: TruckType,
+    productId: number,
+    addingPallets: number,
+    physics: ProductPhysics,
+    excludePalletId?: number,
+  ): Promise<void> {
+    const limits = TRUCK_LIMITS[truckType];
 
-    await em.update(Pallet, palletId, {
-      totalBoxes:     Number(rows?.totalBoxes     ?? 0),
-      totalWeightKg:  Number(rows?.totalWeightKg  ?? 0),
-      totalAmountEur: Number(rows?.totalAmountEur ?? 0),
+    const orderPallets = await em.find(Pallet, {
+      where: { orderId },
+      relations: ['product'],
     });
+
+    const currentSlots = orderPallets
+      .filter(p => p.id !== excludePalletId)
+      .reduce((s, p) => s + p.palletsCount, 0);
+    const currentWeight = orderPallets
+      .filter(p => p.id !== excludePalletId)
+      .reduce((s, p) => s + p.totalWeightKg, 0);
+
+    // Для SET-операции addingPallets может быть отрицательным — тогда это не нужно проверять.
+    // Для ADD всегда положительное.
+    const newSlots  = currentSlots  + addingPallets;
+    const newWeight = currentWeight + addingPallets * physics.palletWeightKg;
+
+    if (newSlots > limits.maxPallets) {
+      throw new BadRequestException(
+        `Превышен лимит паллет фуры ${truckType}: ${newSlots} > ${limits.maxPallets}`,
+      );
+    }
+    if (newWeight > limits.maxWeightKg) {
+      throw new BadRequestException(
+        `Превышен лимит веса фуры ${truckType}: ${newWeight.toFixed(0)} кг > ${limits.maxWeightKg} кг`,
+      );
+    }
+
+    // Неиспользуемая переменная productId нужна для будущих SKU-специфичных лимитов.
+    // Сейчас лимит — общий по фуре, productId оставляем в сигнатуре для явности контракта.
+    void productId;
   }
 
-  /** Авто-распределение нераспределённых паллет по фурам (равномерно по весу). */
   private async autoDistribute(
     em: EntityManager,
     orderId: number,
     pallets: Pallet[],
   ): Promise<number> {
-    const trucks = await em.find(Truck, {
-      where: { orderId },
-      order: { number: 'ASC' },
-    });
+    const trucks = await em.find(Truck, { where: { orderId }, order: { number: 'ASC' } });
     if (!trucks.length) return 0;
 
     let assigned = 0;
     let ti = 0;
 
-    // Считаем уже занятые слоты
-    const slots = await Promise.all(trucks.map(t =>
-      em.count(Pallet, { where: { truckId: t.id } })
-    ));
+    const slots = await Promise.all(trucks.map(t => em.count(Pallet, { where: { truckId: t.id } })));
 
     for (const pallet of pallets) {
-      // Ищем первую незаполненную фуру
       while (ti < trucks.length && slots[ti] >= trucks[ti].maxPallets) ti++;
-      if (ti >= trucks.length) break; // все фуры полны
+      if (ti >= trucks.length) break;
 
       pallet.truckId = trucks[ti].id;
       pallet.status  = PalletStatus.ASSIGNED;
@@ -596,33 +493,48 @@ export class PalletsService {
     return assigned;
   }
 
-  /** Проверить что паллета доступна для редактирования. */
-  private assertEditable(pallet: Pallet): void {
+  private assertEditableForContentChange(pallet: Pallet): void {
     if (!pallet.isEditable) {
       throw new ForbiddenException(
         `Паллета #${pallet.id} заблокирована (статус: ${pallet.status})`,
       );
     }
+    if (pallet.isLegacy) {
+      throw new ForbiddenException(
+        `Паллета #${pallet.id} legacy — содержимое неизменяемо`,
+      );
+    }
   }
 
-  /** Назначить паллету в фуру — вызывается из update(). */
-  private async assignToTruck(
-    pallet: Pallet,
-    truckId: number | null,
-  ): Promise<void> {
+  private assertProductPhysics(product: Product): void {
+    const pw = Number(product.palletWeightKg ?? 0);
+    const bp = Number(product.boxesPerPallet ?? 0);
+    if (!pw || !bp) {
+      throw new BadRequestException(
+        `SKU ${product.sku} без спецификации паллеты — заполните в каталоге`,
+      );
+    }
+  }
+
+  private async assignToTruck(pallet: Pallet, truckId: number | null): Promise<void> {
     if (truckId === null) {
       pallet.truckId = null;
       pallet.status  = PalletStatus.READY;
       return;
     }
 
-    const truck = await this.trucks.findOne({ where: { id: truckId, orderId: pallet.orderId } });
+    const truck = await this.trucks.findOne({ where: { id: truckId, orderId: pallet.orderId ?? undefined } });
     if (!truck) throw new NotFoundException(`Фура #${truckId} не найдена`);
 
-    const currentCount = await this.pallets.count({ where: { truckId } });
-    if (currentCount >= truck.maxPallets) {
+    // Текущая сумма слотов в фуре (по palletsCount)
+    const existing = await this.pallets.find({ where: { truckId }, relations: ['product'] });
+    const currentSlots = existing
+      .filter(p => p.id !== pallet.id)
+      .reduce((s, p) => s + p.palletsCount, 0);
+
+    if (currentSlots + pallet.palletsCount > truck.maxPallets) {
       throw new BadRequestException(
-        `Фура #${truckId} заполнена (${currentCount}/${truck.maxPallets} паллет)`,
+        `Фура #${truckId} не вмещает ${pallet.palletsCount} доп. паллет (${currentSlots}/${truck.maxPallets})`,
       );
     }
 

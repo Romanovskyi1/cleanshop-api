@@ -1,15 +1,20 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, ManyToOne,
-  OneToMany, JoinColumn, CreateDateColumn, UpdateDateColumn, Index,
+  JoinColumn, CreateDateColumn, UpdateDateColumn, Index,
 } from 'typeorm';
+import { Product } from '../../products/entities/product.entity';
 
 export enum PalletStatus {
-  BUILDING  = 'building',   // клиент собирает
-  READY     = 'ready',      // собрана, не назначена в фуру
-  ASSIGNED  = 'assigned',   // назначена в фуру
-  LOCKED    = 'locked',     // окно закрыто, редактирование запрещено
+  BUILDING  = 'building',
+  READY     = 'ready',
+  ASSIGNED  = 'assigned',
+  LOCKED    = 'locked',
 }
 
+/**
+ * Моно-паллета: одна запись = N физических паллет ОДНОГО SKU.
+ * Никаких pallet_items. Агрегаты вычисляются из product × palletsCount.
+ */
 @Entity('pallets')
 @Index(['companyId', 'orderId'])
 export class Pallet {
@@ -29,72 +34,49 @@ export class Pallet {
   @Column({ nullable: false, length: 100, default: '' })
   name: string;
 
-  @Column({ name: 'total_boxes', default: 0 })
-  totalBoxes: number;
-
-  @Column({ name: 'total_weight_kg', type: 'decimal', precision: 10, scale: 2, default: 0 })
-  totalWeightKg: number;
-
-  @Column({ name: 'total_amount_eur', type: 'decimal', precision: 14, scale: 2, default: 0 })
-  totalAmountEur: number;
-
-  @Column({ type: 'enum', enum: PalletStatus, default: PalletStatus.BUILDING })
-  status: PalletStatus;
-
-  @OneToMany(() => PalletItem, item => item.pallet, { cascade: true, eager: true })
-  items: PalletItem[];
-
-  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
-  createdAt: Date;
-
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
-  updatedAt: Date;
-
-  // ── Computed helpers ─────────────────────────────────────────────────
-  get isEditable(): boolean {
-    return this.status === PalletStatus.BUILDING || this.status === PalletStatus.READY;
-  }
-
-  get fillPercent(): number {
-    const maxBoxes = 40; // стандарт паллеты — переопределяется через конфиг
-    return Math.round((this.totalBoxes / maxBoxes) * 100);
-  }
-}
-
-// ── PalletItem ────────────────────────────────────────────────────────────────
-
-@Entity('pallet_items')
-@Index(['palletId', 'productId'], { unique: true })
-export class PalletItem {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @Column({ name: 'pallet_id' })
-  palletId: number;
-
-  @ManyToOne(() => Pallet, pallet => pallet.items, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'pallet_id' })
-  pallet: Pallet;
-
   @Column({ name: 'product_id' })
   productId: number;
 
-  // Снапшот цены на момент добавления
-  @Column({ name: 'price_eur', type: 'decimal', precision: 12, scale: 2 })
-  priceEur: number;
+  @ManyToOne(() => Product, { eager: true })
+  @JoinColumn({ name: 'product_id' })
+  product: Product;
 
-  @Column({ name: 'boxes' })
-  boxes: number;
+  @Column({ name: 'pallets_count', type: 'int', default: 1 })
+  palletsCount: number;
 
-  @Column({ name: 'subtotal', type: 'decimal', precision: 14, scale: 2, insert: false, update: false })
-  subtotalEur: number;
+  @Column({ name: 'is_legacy', type: 'boolean', default: false })
+  isLegacy: boolean;
 
   @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
   idempotencyKey: string | null;
 
+  @Column({ type: 'enum', enum: PalletStatus, default: PalletStatus.BUILDING })
+  status: PalletStatus;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
+
+  // ── Computed ─────────────────────────────────────────────────────────
+  get isEditable(): boolean {
+    return this.status === PalletStatus.BUILDING || this.status === PalletStatus.READY;
+  }
+
+  get totalBoxes(): number {
+    return this.palletsCount * (this.product?.boxesPerPallet ?? 0);
+  }
+
+  get totalWeightKg(): number {
+    return this.palletsCount * Number(this.product?.palletWeightKg ?? 0);
+  }
+
+  get totalAmountEur(): number {
+    const price = Number(this.product?.priceEur ?? 0);
+    const boxes = this.product?.boxesPerPallet ?? 0;
+    const units = this.product?.unitsPerBox ?? 1;
+    // цена паллеты = price × units_per_box × boxes_per_pallet (см. Product.palletPriceEur)
+    return Number((this.palletsCount * price * units * boxes).toFixed(2));
+  }
 }

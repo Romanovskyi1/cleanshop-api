@@ -1,11 +1,11 @@
 import {
   IsString, IsOptional, IsInt, IsPositive,
-  IsIn, Min, Max, IsArray, ArrayNotEmpty,
+  IsIn, Min, IsArray, ArrayNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PalletStatus } from '../entities/pallet.entity';
 
-// ── Создать паллету ──────────────────────────────────────────────────────────
+// ── Создать паллету (низкоуровневое, без авто-консолидации) ──────────────────
 export class CreatePalletDto {
   @IsOptional()
   @IsString()
@@ -14,7 +14,18 @@ export class CreatePalletDto {
   @IsOptional()
   @IsInt()
   @IsPositive()
-  orderId?: number; // если уже привязана к заказу
+  orderId?: number;
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  productId: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  palletsCount?: number;
 }
 
 // ── Обновить паллету ─────────────────────────────────────────────────────────
@@ -26,30 +37,27 @@ export class UpdatePalletDto {
   @IsOptional()
   @IsInt()
   @IsPositive()
-  truckId?: number | null; // null = убрать из фуры
+  truckId?: number | null;
+
+  /** 0 → удалить паллету. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  palletsCount?: number;
 }
 
-// ── Добавить позицию в паллету ───────────────────────────────────────────────
-export class AddPalletItemDto {
+// ── Добавить паллеты SKU в заказ (с авто-консолидацией) ──────────────────────
+export class AddPalletsDto {
   @IsInt()
-  @IsPositive()
+  @Min(1)
   @Type(() => Number)
   productId: number;
 
   @IsInt()
   @Min(1)
-  @Max(10_000)
   @Type(() => Number)
-  boxes: number;
-}
-
-// ── Изменить количество в позиции ────────────────────────────────────────────
-export class UpdatePalletItemDto {
-  @IsInt()
-  @Min(1)
-  @Max(10_000)
-  @Type(() => Number)
-  boxes: number;
+  palletsCount: number;
 }
 
 // ── Назначить паллеты в фуру (batch) ─────────────────────────────────────────
