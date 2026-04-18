@@ -9,8 +9,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * CHECK-инвариант: активный продукт обязан иметь pallet_weight_kg.
  * Inactive SKU исключены — для них физику можно ввести позже через admin UI (Phase 4).
  */
-export class BackfillProductPhysics1700000014 implements MigrationInterface {
-  name = 'BackfillProductPhysics1700000014';
+export class BackfillProductPhysics1700000014000 implements MigrationInterface {
+  name = 'BackfillProductPhysics1700000014000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     // ── 1. Backfill активных SKU ─────────────────────────────────────────

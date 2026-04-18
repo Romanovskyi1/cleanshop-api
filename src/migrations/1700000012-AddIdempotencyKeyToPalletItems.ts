@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddIdempotencyKeyToPalletItems1700000012 implements MigrationInterface {
+export class AddIdempotencyKeyToPalletItems1700000012000 implements MigrationInterface {
+  name = 'AddIdempotencyKeyToPalletItems1700000012000';
+
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE pallet_items ADD COLUMN IF NOT EXISTS idempotency_key UUID NULL

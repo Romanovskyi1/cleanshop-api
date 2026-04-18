@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   — Одно-SKU паллеты: product_id = max product, pallets_count = ceil(total_boxes / boxes_per_pallet).
  *   — Mixed-SKU паллеты: is_legacy = true, product_id = SKU с наибольшим числом коробок.
  */
-export class MigrateToMonoPallet1700000013 implements MigrationInterface {
-  name = 'MigrateToMonoPallet1700000013';
+export class MigrateToMonoPallet1700000013000 implements MigrationInterface {
+  name = 'MigrateToMonoPallet1700000013000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     const ts = new Date().toISOString().slice(0, 10).replace(/-/g, ''); // YYYYMMDD
@@ -115,12 +115,43 @@ export class MigrateToMonoPallet1700000013 implements MigrationInterface {
       ALTER TABLE "pallets" ALTER COLUMN "product_id" SET NOT NULL
     `);
 
-    // ── 10. Дроп старых хранимых агрегатов pallet-уровня.
+    // ── 10. Дроп зависимой view v_truck_summary (использует total_weight_kg
+    //       и total_amount_eur). Пересоздаём её ниже в новой форме.
+    await queryRunner.query(`DROP VIEW IF EXISTS "v_truck_summary"`);
+
+    // ── 10b. Дроп старых хранимых агрегатов pallet-уровня.
     //       Они теперь computed в entity. Для order-агрегатов оставляем как есть
     //       (заполняются иным способом при необходимости).
     await queryRunner.query(`ALTER TABLE "pallets" DROP COLUMN IF EXISTS "total_boxes"`);
     await queryRunner.query(`ALTER TABLE "pallets" DROP COLUMN IF EXISTS "total_weight_kg"`);
     await queryRunner.query(`ALTER TABLE "pallets" DROP COLUMN IF EXISTS "total_amount_eur"`);
+
+    // ── 10c. Пересоздаём v_truck_summary через JOIN products.
+    //       Вес = pallets_count * products.pallet_weight_kg.
+    //       Сумма = pallets_count * products.boxes_per_pallet * products.price_eur.
+    await queryRunner.query(`
+      CREATE VIEW "v_truck_summary" AS
+      SELECT
+        t.id                                        AS truck_id,
+        t.order_id,
+        t.number                                    AS truck_number,
+        t.max_pallets,
+        t.max_weight_kg,
+        COALESCE(SUM(p.pallets_count), 0)           AS pallet_count,
+        COALESCE(SUM(p.pallets_count * prod.pallet_weight_kg), 0) AS total_weight_kg,
+        COALESCE(SUM(p.pallets_count * prod.boxes_per_pallet * prod.price_eur), 0) AS total_amount_eur,
+        ROUND(
+          COALESCE(SUM(p.pallets_count), 0)::numeric / NULLIF(t.max_pallets, 0) * 100, 1
+        )                                           AS pallet_fill_pct,
+        ROUND(
+          COALESCE(SUM(p.pallets_count * prod.pallet_weight_kg), 0)
+            / NULLIF(t.max_weight_kg::numeric, 0) * 100, 1
+        )                                           AS weight_fill_pct
+      FROM trucks t
+      LEFT JOIN pallets  p    ON p.truck_id   = t.id
+      LEFT JOIN products prod ON prod.id      = p.product_id
+      GROUP BY t.id, t.order_id, t.number, t.max_pallets, t.max_weight_kg
+    `);
 
     // ── 11. Дроп старой функции пересчёта pallet-уровня.
     //       Order-уровень recalc_order_totals ломается (читает total_weight_kg из pallets).
