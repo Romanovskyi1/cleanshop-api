@@ -268,4 +268,13 @@ export class ProductsService {
     return this.repo.save(product);
   }
 
+  /**
+   * Получить сырые I18n данные товара — для формы редактирования в admin-панели.
+   */
+  async adminGetRaw(id: number): Promise<Product> {
+    const product = await this.repo.findOne({ where: { id } });
+    if (!product) throw new NotFoundException(`Продукт #${id} не найден`);
+    return product;
+  }
+
 }

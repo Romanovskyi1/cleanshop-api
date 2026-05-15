@@ -51,6 +51,16 @@ export class ProductsController {
   }
 
   /**
+   * GET /catalog/:id/raw
+   * Сырые I18n данные товара — только для admin, используется формой редактирования.
+   */
+  @Get(':id/raw')
+  @Roles(UserRole.ADMIN)
+  getRaw(@Param('id', ParseIntPipe) id: number) {
+    return this.service.adminGetRaw(id);
+  }
+
+  /**
    * GET /catalog/:id
    * Карточка товара — полные данные.
    */
