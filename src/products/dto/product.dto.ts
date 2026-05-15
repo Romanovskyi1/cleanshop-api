@@ -88,14 +88,19 @@ export class CreateProductDto {
 
 // ── Обновить продукт (admin) ─────────────────────────────────────────────────
 export class UpdateProductDto {
-  @IsOptional() @IsObject()        name?:            I18nString;
-  @IsOptional() @IsObject()        description?:     I18nString;
-  @IsOptional() @IsNumber() @Min(0.01) priceEur?:   number;
-  @IsOptional() @IsInt()   @Min(0) stockPallets?:   number;
-  @IsOptional() @IsBoolean()       isEco?:           boolean;
-  @IsOptional() @IsBoolean()       isActive?:        boolean;
-  @IsOptional() @IsBoolean()       isNew?:           boolean;
-  @IsOptional() @IsBoolean()       isHit?:           boolean;
+  @IsOptional() @IsObject()            name?:            I18nString;
+  @IsOptional() @IsObject()            description?:     I18nString;
+  @IsOptional() @IsEnum(ProductCategory) category?:      ProductCategory;
+  @IsOptional() @IsNumber() @Min(0.01) priceEur?:        number;
+  @IsOptional() @IsInt()    @Min(1)    unitsPerBox?:      number;
+  @IsOptional() @IsInt()    @Min(1)    boxesPerPallet?:   number;
+  @IsOptional() @IsNumber() @Min(0)    palletWeightKg?:   number;
+  @IsOptional() @IsNumber() @Min(0)    boxWeightKg?:      number;
+  @IsOptional() @IsInt()    @Min(0)    stockPallets?:     number;
+  @IsOptional() @IsBoolean()           isEco?:            boolean;
+  @IsOptional() @IsBoolean()           isActive?:         boolean;
+  @IsOptional() @IsBoolean()           isNew?:            boolean;
+  @IsOptional() @IsBoolean()           isHit?:            boolean;
   @IsOptional() @IsArray() @IsString({ each: true }) certifications?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) images?:         string[];
 }
