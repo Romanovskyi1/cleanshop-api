@@ -258,7 +258,7 @@ export class ProductsService {
   /** Localise I18nString с fallback-цепочкой: запрошенный → en → ru → '' */
   private localise(field: Record<string, string> | null | undefined, lang: string): string {
     if (!field) return '';
-    return field[lang] ?? field['en'] ?? field['ru'] ?? '';
+    return field[lang] || field['en'] || field['ru'] || '';
   }
 
   async addImages(id: number, urls: string[]): Promise<Product> {
