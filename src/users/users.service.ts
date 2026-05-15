@@ -69,6 +69,10 @@ export class UsersService {
     return user;
   }
 
+  save(user: User): Promise<User> {
+    return this.repo.save(user);
+  }
+
   /**
    * Привязать пользователя к компании.
    */

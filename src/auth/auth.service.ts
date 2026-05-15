@@ -5,9 +5,9 @@ import {
   Logger,
 } from '@nestjs/common';
 
-const MANAGER_CREDENTIALS: Record<string, { password: string; telegramId: string }> = {
-  admin:   { password: 'cleanshop2025', telegramId: '1114140052' },
-  manager: { password: 'manager2025',   telegramId: '453784171'  },
+const MANAGER_CREDENTIALS: Record<string, { password: string; telegramId: string; role: string }> = {
+  admin:   { password: 'cleanshop2025', telegramId: '1114140052', role: 'admin'   },
+  manager: { password: 'manager2025',   telegramId: '453784171',  role: 'manager' },
 };
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -224,6 +224,11 @@ export class AuthService {
     const user = await this.users.findByTelegramId(cred.telegramId);
     if (!user) {
       throw new UnauthorizedException('Пользователь не найден в БД');
+    }
+    // Применяем роль из конфига, если в БД она занижена
+    if (user.role !== cred.role) {
+      user.role = cred.role as any;
+      await this.users.save(user);
     }
     return {
       accessToken:  this.signAccess(user),
