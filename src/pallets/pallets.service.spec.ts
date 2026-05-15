@@ -196,20 +196,6 @@ describe('PalletsService', () => {
       await service.addItem(1, COMPANY_ID, { productId: 1, boxes: 24 }, productData);
     });
 
-    it('отклоняет некратное количество коробок', async () => {
-      const pallet = makePallet({ items: [] });
-      mockDataSource.transaction.mockImplementationOnce(async (fn) => {
-        const em = {
-          findOne: jest.fn().mockResolvedValue(pallet),
-          find: jest.fn().mockResolvedValue([pallet]),
-        };
-        return fn(em);
-      });
-
-      await expect(
-        service.addItem(1, COMPANY_ID, { productId: 1, boxes: 7 }, productData),
-      ).rejects.toThrow(BadRequestException);
-    });
 
     it('отклоняет переполнение паллеты (> 300 коробок)', async () => {
       const existingItem = { productId: 99, boxes: 300, subtotalEur: 100 } as PalletItem;

@@ -164,13 +164,6 @@ export class PalletsService {
         }
       }
 
-      // Проверка кратности
-      if (dto.boxes % productData.unitsPerBox !== 0) {
-        throw new BadRequestException(
-          `Количество коробок должно быть кратно ${productData.unitsPerBox}`,
-        );
-      }
-
       // Проверка вместимости (коробки)
       const currentBoxes   = pallet.items.reduce((s, i) => s + i.boxes, 0);
       const existingItem   = pallet.items.find(i => i.productId === dto.productId);
